@@ -35,4 +35,4 @@
 
 Branch: `feature/project-bootstrap`
 
-Commit: pending
+Commit: `c64e3b8 feat: bootstrap ChangeProof development environment`
