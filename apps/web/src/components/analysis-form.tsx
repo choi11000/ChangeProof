@@ -208,6 +208,10 @@ export function AnalysisForm() {
   const [executionError, setExecutionError] = useState<string | null>(null);
   const [provingPlanId, setProvingPlanId] = useState<string | null>(null);
   const [remediationProofs, setRemediationProofs] = useState<Record<string, RemediationProof>>({});
+  const demoRepository = process.env.NEXT_PUBLIC_DEMO_REPOSITORY?.trim() ?? "";
+  const demoPullRequest = process.env.NEXT_PUBLIC_DEMO_PR?.trim() ?? "";
+  const demoConfigured =
+    demoRepository.length > 0 && /^\d+$/.test(demoPullRequest) && Number(demoPullRequest) > 0;
 
   const counts = useMemo(() => {
     const files = result?.changed_files ?? [];
@@ -327,6 +331,19 @@ export function AnalysisForm() {
         <button disabled={loading} type="submit">
           {loading ? "Analyzing…" : "Analyze change"} <span>→</span>
         </button>
+        {demoConfigured && (
+          <button
+            className="btn-load-demo"
+            disabled={loading}
+            onClick={() => {
+              setRepository(demoRepository);
+              setPullRequest(demoPullRequest);
+            }}
+            type="button"
+          >
+            Load demo PR
+          </button>
+        )}
       </form>
 
       {error && <p className="analysis-error" role="alert">{error}</p>}

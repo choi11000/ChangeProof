@@ -18,6 +18,12 @@ export default function Home() {
           and a remediation you can verify.
         </p>
 
+        <ol className="judge-flow" aria-label="Three-step proof flow">
+          <li><b>1</b> Analyze the change</li>
+          <li><b>2</b> Reproduce the failure</li>
+          <li><b>3</b> Verify the fix</li>
+        </ol>
+
         <AnalysisForm />
 
         <ol className="pipeline" aria-label="Analysis pipeline">

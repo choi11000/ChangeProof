@@ -4,7 +4,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import Home from "./page";
 
 describe("Home", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
 
   it("renders the pull request analysis form", () => {
     render(<Home />);
@@ -12,6 +15,23 @@ describe("Home", () => {
     expect(screen.getByRole("heading", { name: /prove a change is safe/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/github repository/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /analyze change/i })).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: /three-step proof flow/i })).toHaveTextContent(
+      /analyze the change/i,
+    );
+    expect(screen.queryByRole("button", { name: /load demo pr/i })).not.toBeInTheDocument();
+  });
+
+  it("loads configured demo values without starting analysis", () => {
+    vi.stubEnv("NEXT_PUBLIC_DEMO_REPOSITORY", "demo/public-repo");
+    vi.stubEnv("NEXT_PUBLIC_DEMO_PR", "17");
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    render(<Home />);
+
+    fireEvent.click(screen.getByRole("button", { name: /load demo pr/i }));
+
+    expect(screen.getByLabelText(/github repository/i)).toHaveValue("demo/public-repo");
+    expect(screen.getByLabelText(/pull request/i)).toHaveValue(17);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("submits a PR and renders deterministic change facts", async () => {

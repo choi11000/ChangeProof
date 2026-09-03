@@ -15,7 +15,11 @@ nav { height: 76px; display: flex; align-items: center; justify-content: space-b
 h1 { max-width: 900px; margin: 18px 0 24px; font-size: clamp(52px, 8vw, 104px); line-height: .92; letter-spacing: -.075em; }
 h1 span { color: #758078; }
 .lede { max-width: 650px; color: var(--muted); font-size: 18px; line-height: 1.65; }
+.judge-flow { display: flex; flex-wrap: wrap; gap: 18px; margin: 28px 0 0; padding: 0; list-style: none; color: var(--muted); font: 13px monospace; text-transform: uppercase; }
+.judge-flow li { display: flex; align-items: center; gap: 8px; }
+.judge-flow b { display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid var(--acid); border-radius: 50%; color: var(--acid); }
 .analysis-card { display: grid; grid-template-columns: 1fr 150px 190px; gap: 14px; margin-top: 58px; padding: 16px; background: rgba(17,22,18,.92); border: 1px solid #2a352c; border-radius: 12px; box-shadow: 0 25px 80px rgba(0,0,0,.35); }
+.btn-load-demo { grid-column: 1 / -1; width: max-content; justify-self: end; padding: 8px 14px; border: 1px solid #465348; background: transparent; color: var(--muted); }
 .field { display: flex; flex-direction: column; gap: 8px; }
 label { color: #8d978f; font: 11px monospace; letter-spacing: .08em; text-transform: uppercase; }
 input { width: 100%; height: 48px; padding: 0 14px; background: #090c0a; color: white; border: 1px solid #303b32; border-radius: 6px; font-size: 14px; }
