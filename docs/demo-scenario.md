@@ -1,5 +1,11 @@
 # Demo Scenario
 
+## Final proof moment
+
+After the original dropped-column fixture produces SQLSTATE `42703` and `PROVEN_FAIL`, select **Verify remediation**. The server authoritatively reruns the original subject, applies the allowlisted compatibility migration that preserves `legacy_status`, and executes the same verification query. The proof is `PROVEN_FIXED` only when the contract digest is identical, the subject digest changed, and the remediated run is `PROVEN_PASS`.
+
+The UI states: “Failure reproduced before remediation. The same experiment passed after remediation.” This claim applies only to the controlled experiment.
+
 The synthetic `samples/risky-saas` repository supplies deterministic known-positive cases for the ChangeProof demo.
 
 ## Baseline

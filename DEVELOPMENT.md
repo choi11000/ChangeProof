@@ -74,6 +74,16 @@ curl -X POST http://localhost:8000/api/v1/experiments/execute \
   -d '{"fixture_id":"risky-saas/drop-legacy-status"}'
 ```
 
+Verify an allowlisted remediation by authoritatively rerunning the before/after pair:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/proofs/remediation \
+  -H "Content-Type: application/json" \
+  -d '{"fixture_id":"risky-saas/drop-legacy-status"}'
+```
+
+The request cannot submit verdicts, digests, SQLSTATEs, or prior run results. A real `PROVEN_FIXED` acceptance requires the sandbox PostgreSQL service; mocks do not satisfy the runtime gate.
+
 ## Git workflow
 
 Create a focused branch from `main`, use Conventional Commits, run relevant checks, update `DEVLOG.md`, review `git diff`, and commit one meaningful change. Never commit `.env` or credentials.

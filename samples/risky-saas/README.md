@@ -2,6 +2,8 @@
 
 This synthetic application is the deterministic ChangeProof demo fixture. It contains no real customer data or credentials.
 
+The `remediations/` directory contains audited, deterministic counterparts for the four intentionally failing migrations. They are executable only through ChangeProof's controlled registry and are not generalized production recommendations.
+
 ## Intentional migration risks
 
 1. `001_drop_legacy_status.sql` removes a column still read by the order service.

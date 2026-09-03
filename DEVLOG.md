@@ -291,6 +291,31 @@ Commits:
 - Evidence implementation: **COMPLETE**
 - Runtime evidence proof: **NOT VERIFIED**
 
+## 2026-09-03 — Phase 7 Deterministic Remediation & Same-Experiment Proof
+
+### Added
+
+- Four allowlisted remediation subjects for the controlled risky SaaS fixtures
+- Deterministic remediation strategies and registry; no arbitrary or AI-generated execution
+- Server-authoritative `POST /api/v1/proofs/remediation` before/after rerun workflow
+- `PROVEN_FIXED`, `NOT_FIXED`, `INCONCLUSIVE`, and `EXECUTION_ERROR` aggregate verdicts
+- UI remediation action and before/same-contract/after proof presentation
+- ADR 009 documenting proof identity, trust boundaries, and experiment-scoped claims
+
+### Tests
+
+- API: `pytest` PASS (150 passed, 11 sandbox tests skipped, 95.13% coverage)
+- API: Ruff and Python bytecode compilation PASS
+- Web: ESLint, TypeScript, Vitest (5 tests), production build, and npm audit PASS
+- Browser smoke: local UI controls and heading visible, no console errors; proof interaction blocked by unavailable sandbox
+- Actual PostgreSQL original/remediated acceptance: BLOCKED because Docker is unavailable
+
+### Status
+
+- Remediation implementation: **COMPLETE**
+- Same-experiment re-execution implementation: **COMPLETE**
+- End-to-end PostgreSQL proof: **NOT VERIFIED**
+
 
 
 

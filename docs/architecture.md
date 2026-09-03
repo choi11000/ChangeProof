@@ -12,9 +12,9 @@ ChangeProof never converts an LLM opinion directly into a verdict. Facts come fr
 5. Experiment Planning       Deterministic ExperimentCompiler      COMPLETE
 6. Execution                 Ephemeral PostgreSQL                  IMPLEMENTED; RUNTIME BLOCKED
 7. Evidence                  Observed SQLSTATE results             IMPLEMENTED; RUNTIME BLOCKED
-8. Remediation               Deterministic schema fix              NEXT
-9. Re-execution              Same experiment
-10. Proof
+8. Remediation               Deterministic schema fix              IMPLEMENTED; RUNTIME BLOCKED
+9. Re-execution              Same experiment                       IMPLEMENTED; RUNTIME BLOCKED
+10. Proof                    Server-authoritative invariants       IMPLEMENTED; RUNTIME BLOCKED
 ```
 
 The product promise is not merely to predict failure:
@@ -35,13 +35,21 @@ The product promise is not merely to predict failure:
 - `analyzers/experiment_compiler.py`: deterministic compiler generating executable, read-oriented experiment plans.
 - `analyzers/experiment_verifier.py`: deterministic verifier attributing PostgreSQL observations to `PROVEN_FAIL` / `PROVEN_PASS` / `INCONCLUSIVE` / `EXECUTION_ERROR`.
 - `schemas/experiment_identity.py`: canonical, server-owned SHA-256 identities separating the stable experiment contract from the executed migration subject.
-
-Execution requests cannot provide proof digests. The server hashes sorted, compact UTF-8 JSON over baseline schema, seed data, target, template, verification SQL, and verifier contract version for `experiment_contract_digest`; migration content and candidate variant form `subject_digest`. Verdict attribution requires exact SQLSTATE equality, while database cleanup status is recorded separately from the hypothesis verdict.
 - `executors/postgres_experiment.py`: ephemeral schema isolation (`cp_run_<hex12>`), statement/lock timeouts, and secret-redacted execution runner.
 - `fixtures/experiment_registry.py`: server-controlled registry of synthetic demo fixtures.
 - `postgres`: persistent product data such as analyses, steps, and evidence.
 - `sandbox-postgres`: disposable target for isolated experiment execution.
 - `samples/risky-saas`: synthetic demonstration repository with known-positive risks.
+
+Execution requests cannot provide proof digests. The server hashes sorted, compact UTF-8 JSON over baseline schema, seed data, target, template, verification SQL, and verifier contract version for `experiment_contract_digest`; migration content and candidate variant form `subject_digest`. Verdict attribution requires exact SQLSTATE equality, while database cleanup status is recorded separately from the hypothesis verdict.
+
+## Deterministic remediation and same-experiment proof
+
+`ControlledRemediation` pairs each failing demo fixture with one audited SQL migration. The registry contains compatibility preservation for the dropped column and table cases, synthetic backfill before `NOT NULL`, and explicit synthetic data normalization before type narrowing. Safe additive changes have no remediation.
+
+`POST /api/v1/proofs/remediation` accepts only a controlled fixture ID. The server reruns the original fixture, selects the paired remediation, reruns it against the same baseline, seed, target, template, verification SQL, and verifier version, and compares server-owned identities. `PROVEN_FIXED` requires original `PROVEN_FAIL`, remediated `PROVEN_PASS`, identical contract digests, different subject digests, and no execution error. A fail-after-fail pair is `NOT_FIXED`; mismatched identity or incomplete evidence is `INCONCLUSIVE`.
+
+AI remains limited to hypothesis reasoning. It does not generate remediation SQL, execute commands, or assign either experiment or proof verdicts. A proof applies only to its controlled experiment, not to the pull request or production system.
 
 ## SQL change analysis
 
