@@ -29,6 +29,8 @@ The product promise is not merely to predict failure:
 - `services/pull_request_service.py`: change-intake, dependency discovery, and planning orchestration.
 - `services/repository_source_service.py`: bounded source snapshot collection at PR head SHA.
 - `services/failure_planning_service.py`: safe failure planning orchestration and domain validation.
+- `services/planning_context_budget.py`: deterministic change/evidence/warning selection with transparent truncation statistics.
+- `services/ai_planning_cache.py`: bounded TTL planning cache and same-fingerprint async single-flight.
 - `services/experiment_execution_service.py`: controlled fixture validation, executor invocation, and deterministic verdict synthesis.
 - `analyzers/file_classifier.py`: deterministic path-based classification and content policy.
 - `analyzers/dependency.py`: deterministic target extraction, reference matching, and impact summary.
@@ -50,6 +52,14 @@ Execution requests cannot provide proof digests. The server hashes sorted, compa
 `POST /api/v1/proofs/remediation` accepts only a controlled fixture ID. The server reruns the original fixture, selects the paired remediation, reruns it against the same baseline, seed, target, template, verification SQL, and verifier version, and compares server-owned identities. `PROVEN_FIXED` requires original `PROVEN_FAIL`, remediated `PROVEN_PASS`, identical contract digests, different subject digests, and no execution error. A fail-after-fail pair is `NOT_FIXED`; mismatched identity or incomplete evidence is `INCONCLUSIVE`.
 
 AI remains limited to hypothesis reasoning. It does not generate remediation SQL, execute commands, or assign either experiment or proof verdicts. A proof applies only to its controlled experiment, not to the pull request or production system.
+
+## Public-service runtime guards
+
+Repository verification returns typed visibility metadata, and the default/production boundary rejects private repositories before PR content is fetched. AI context is bounded and deterministically prioritized by source scope, match strength, unchanged-reference value, and target coverage. A planning fingerprint includes the PR head SHA, bounded context, model, and prompt version. Only domain-valid structured results enter the bounded TTL cache; simultaneous identical requests share one upstream call. Responses expose token counts when the OpenAI API supplies them, never a hard-coded dollar estimate.
+
+The three expensive POST routes have independent fixed-window per-client limits. Client identity comes from the socket peer unless a trusted-proxy mode is explicitly enabled. Experiments and an entire before/after remediation proof each acquire one non-blocking sandbox slot, so a proof cannot deadlock by reacquiring its own slot. Stores and concurrency are bounded, but process-local; horizontal deployments require a shared limiter/cache design in a later phase.
+
+Every response receives a server-generated request ID. Unexpected errors retain a secret-redacted traceback in server logs and return only a generic correlation reference. CORS origins and API documentation exposure are configuration-driven, and production settings fail validation when the public-repository policy, sandbox URL, or explicit CORS origin is missing.
 
 ## SQL change analysis
 

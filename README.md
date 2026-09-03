@@ -13,6 +13,8 @@ ChangeProof is an evidence-backed database change risk agent. It turns real pull
 - Deterministic SQLSTATE attribution and verdict verification (`PROVEN_FAIL` / `PROVEN_PASS`)
 - Evidence-linked failure proof
 - Allowlisted deterministic remediation and same-experiment proof
+- Bounded/cached AI planning, per-client API limits, and sandbox concurrency guards
+- Public-repository-only analysis by default
 
 The current stacked development branch ingests a GitHub pull request, classifies changed files, parses SQL migrations at the exact PR revision, discovers cross-layer application source references across the repository tree at `head_sha`, derives evidence-grounded failure hypotheses, compiles safe experiment plans, and executes controlled synthetic fixtures in isolated PostgreSQL schemas to reproduce failures and capture concrete SQLSTATE evidence.
 
@@ -36,12 +38,14 @@ Open:
 - Web: http://localhost:3000
 - API docs: http://localhost:8000/docs
 - Health: http://localhost:8000/api/v1/health
+- Liveness: http://localhost:8000/api/v1/health/live
+- Readiness: http://localhost:8000/api/v1/health/ready
 
 No API keys are required for the bootstrap. Add keys only to the local `.env`; never commit them.
 
 ## GitHub PR analysis & Experiment Execution
 
-Public repositories can be analyzed without authentication until GitHub's anonymous rate limit is reached. Set `GITHUB_TOKEN` only in `.env` for authenticated read-only requests or private repositories.
+Public repositories can be analyzed without authentication until GitHub's anonymous rate limit is reached. The default and production policy rejects private repositories even when the server credential could read them. If a token is needed for rate limits, use a public-only or minimum-scope fine-grained credential—never a broad personal access token that can read unrelated private repositories.
 
 ```http
 POST /api/v1/analyses/github-pr
@@ -80,6 +84,7 @@ The proof endpoint accepts only a fixture ID. Digests, verdicts, SQLSTATE eviden
 ## Development
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for native setup, tests, and project conventions. Architecture and product flow are documented in [docs/architecture.md](docs/architecture.md).
+Provider-neutral production configuration and secret guidance are in [docs/deployment.md](docs/deployment.md).
 
 ## Status
 
