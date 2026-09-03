@@ -16,7 +16,11 @@ Change -> Understand -> Dependencies -> Risk hypothesis
 - `apps/api`: FastAPI HTTP boundary and future explicit analysis state machine.
 - `postgres`: persistent product data such as analyses, steps, and evidence.
 - `sandbox-postgres`: opt-in disposable target for migration validation.
-- `samples/risky-saas`: synthetic demonstration repository (Phase 2).
+- `samples/risky-saas`: synthetic demonstration repository with known-positive risks.
+
+## SQL change analysis
+
+`SqlMigrationParser` parses PostgreSQL DDL with sqlglot and converts supported statements into Pydantic contracts. Each record identifies the source statement, operation, affected table or column, type/default/nullability/reference metadata, and whether the operation is destructive. Unsupported non-DDL statements produce no fabricated changes; invalid SQL returns a domain-specific parse error.
 
 ## Planned analysis state
 

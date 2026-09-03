@@ -36,3 +36,33 @@
 Branch: `feature/project-bootstrap`
 
 Commit: `c64e3b8 feat: bootstrap ChangeProof development environment`
+
+## 2026-09-03 — SQL migration analysis
+
+### Added
+
+- Typed PostgreSQL SQL change contracts
+- sqlglot-backed deterministic migration parser
+- CREATE/DROP table and index parsing
+- ADD/DROP/ALTER column parsing including nullability and defaults
+- Foreign-key reference extraction and destructive-operation flags
+- Synthetic risky SaaS schema, seed data, application dependency, and four migration scenarios
+- Demo scenario documentation and parser tests
+
+### Decisions
+
+- sqlglot 30.17.0 is pinned as the PostgreSQL AST parser.
+- Unsupported non-DDL statements return no changes rather than inferred facts.
+- Invalid migrations raise a domain-specific error without exposing fabricated results.
+
+### Tests
+
+- API: `pytest` PASS (8 tests, 97.6% coverage)
+- API: `ruff check .` PASS
+- API: Python bytecode compilation PASS
+
+### Git
+
+Branch: `feature/sql-change-parser`
+
+Commit: pending

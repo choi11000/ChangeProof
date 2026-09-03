@@ -13,7 +13,7 @@ ChangeProof is an evidence-backed database change risk agent. It analyzes applic
 - Evidence-linked deterministic risk scoring
 - Remediation and re-validation
 
-The current Phase 1 establishes the runnable web, API, and database foundation. Analysis capabilities are added incrementally so every phase stays testable.
+The runnable web, API, and database foundation is complete. Phase 2 adds a typed PostgreSQL migration parser and a synthetic risky SaaS fixture while keeping analysis deterministic and testable without an AI key.
 
 ## Quick start
 
@@ -38,4 +38,4 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for native setup, tests, and project conven
 
 ## Status
 
-Phase 1: project bootstrap. See [DEVLOG.md](DEVLOG.md) for verified results and the next implementation target.
+Phase 2: SQL migration analysis. See [DEVLOG.md](DEVLOG.md) for verified results and the next implementation target.
