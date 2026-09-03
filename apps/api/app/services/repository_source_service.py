@@ -129,6 +129,7 @@ class RepositorySourceService:
                         ),
                     )
                 )
+                scan_complete = False
                 continue
 
             text_content = content.content or ""

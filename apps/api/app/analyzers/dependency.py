@@ -1,8 +1,10 @@
+import hashlib
 import re
 from collections.abc import Iterable
 
 from app.core.redaction import redact_lines
 from app.schemas.dependency import (
+    ChangeFact,
     DependencyEvidence,
     DependencyMatchKind,
     DependencyTarget,
@@ -28,39 +30,94 @@ TABLE_OPERATIONS = {
 }
 
 
-def extract_dependency_targets(sql_files: list[SqlFileAnalysis]) -> list[DependencyTarget]:
-    """Extract distinct schema targets from analyzed SQL migration changes."""
-    targets: list[DependencyTarget] = []
-    seen: set[tuple[DependencyTargetType, str, str | None]] = set()
+def compute_change_id(
+    sql_file_path: str,
+    content_sha: str | None,
+    statement_index: int,
+    operation: str,
+    table: str | None,
+    column: str | None,
+) -> str:
+    """Generate a stable, deterministic identifier for a SQL change fact."""
+    raw = (
+        f"{sql_file_path}:{content_sha or ''}:{statement_index}:{operation}:"
+        f"{table or ''}:{column or ''}"
+    )
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+    return f"change_{digest}"
 
+
+def compute_evidence_id(
+    target_type: str,
+    target_table: str,
+    target_column: str | None,
+    path: str,
+    line: int,
+    match_kind: str,
+) -> str:
+    """Generate a stable, deterministic identifier for a dependency evidence match."""
+    col_str = target_column.lower() if target_column else ""
+    raw = f"{target_type}:{target_table.lower()}:{col_str}:{path}:{line}:{match_kind}"
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+    return f"ev_{digest}"
+
+
+def build_change_facts(sql_files: list[SqlFileAnalysis]) -> list[ChangeFact]:
+    """Build change facts with stable deterministic IDs from parsed SQL files."""
+    facts: list[ChangeFact] = []
     for file_analysis in sql_files:
         if not file_analysis.analysis:
             continue
         for change in file_analysis.analysis.changes:
-            if change.operation in COLUMN_OPERATIONS and change.table and change.column:
-                key = (DependencyTargetType.COLUMN, change.table.lower(), change.column.lower())
-                if key not in seen:
-                    seen.add(key)
-                    targets.append(
-                        DependencyTarget(
-                            type=DependencyTargetType.COLUMN,
-                            table=change.table,
-                            column=change.column,
-                            source_change=change,
-                        )
-                    )
-            elif change.operation in TABLE_OPERATIONS and change.table:
-                key = (DependencyTargetType.TABLE, change.table.lower(), None)
-                if key not in seen:
-                    seen.add(key)
-                    targets.append(
-                        DependencyTarget(
-                            type=DependencyTargetType.TABLE,
-                            table=change.table,
-                            column=None,
-                            source_change=change,
-                        )
-                    )
+            cid = compute_change_id(
+                file_analysis.path,
+                file_analysis.content_sha,
+                change.statement_index,
+                change.operation.value,
+                change.table,
+                change.column,
+            )
+            facts.append(
+                ChangeFact(
+                    id=cid,
+                    sql_file_path=file_analysis.path,
+                    content_sha=file_analysis.content_sha,
+                    statement_index=change.statement_index,
+                    change=change,
+                )
+            )
+    return facts
+
+
+def extract_dependency_targets(
+    sql_files: list[SqlFileAnalysis],
+    change_facts: list[ChangeFact] | None = None,
+) -> list[DependencyTarget]:
+    """Extract schema targets, preserving change_ids for all changes touching the entity."""
+    if change_facts is None:
+        change_facts = build_change_facts(sql_files)
+
+    targets_map: dict[tuple[DependencyTargetType, str, str | None], list[str]] = {}
+
+    for fact in change_facts:
+        change = fact.change
+        if change.operation in COLUMN_OPERATIONS and change.table and change.column:
+            key = (DependencyTargetType.COLUMN, change.table, change.column)
+            targets_map.setdefault(key, []).append(fact.id)
+        elif change.operation in TABLE_OPERATIONS and change.table:
+            key = (DependencyTargetType.TABLE, change.table, None)
+            targets_map.setdefault(key, []).append(fact.id)
+
+    targets: list[DependencyTarget] = []
+    for (target_type, table, column), cids in targets_map.items():
+        targets.append(
+            DependencyTarget(
+                type=target_type,
+                table=table,
+                column=column,
+                change_ids=cids,
+            )
+        )
     return targets
 
 
@@ -149,6 +206,7 @@ class DependencyAnalyzer:
         assert target.column is not None
         column_variants = get_column_variants(target.column)
         table_variants = get_table_variants(target.table)
+        table_variant_lowers = {v.lower() for v in table_variants}
 
         col_regexes = [
             re.compile(r"\b" + re.escape(var) + r"\b", re.IGNORECASE) for var in column_variants
@@ -157,19 +215,19 @@ class DependencyAnalyzer:
             re.compile(r"\b" + re.escape(var) + r"\b", re.IGNORECASE) for var in table_variants
         ]
 
-        # Qualified patterns:
-        # 1. Attribute access on any object or table: obj.column or Order.column or self.column
-        attr_pattern = re.compile(
-            r"(?:\b[A-Za-z_][A-Za-z0-9_]*\s*\.\s*(?:"
+        # Attribute access: capture (qualifier).(column_variant)
+        attr_regex = re.compile(
+            r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\.\s*("
             + "|".join(re.escape(var) for var in column_variants)
-            + r")\b)",
+            + r")\b",
             re.IGNORECASE,
         )
-        # 2. Dictionary/bracket access: obj["column"] or obj['column']
-        dict_pattern = re.compile(
-            r"""(?:\[\s*['"](?:\s*"""
+
+        # Dictionary access: capture (qualifier)["column_variant"] or ['column_variant']
+        dict_regex = re.compile(
+            r"""\b([A-Za-z_][A-Za-z0-9_]*)\s*\[\s*['"]\s*("""
             + "|".join(re.escape(var) for var in column_variants)
-            + r""")['"]\s*\])""",
+            + r""")\s*['"]\s*\]""",
             re.IGNORECASE,
         )
 
@@ -181,12 +239,23 @@ class DependencyAnalyzer:
             if not has_col_match:
                 continue
 
-            # Check for qualified reference first
-            is_attr_ref = bool(attr_pattern.search(line))
-            is_dict_ref = bool(dict_pattern.search(line))
+            # Hardening A: Check if qualifier specifically matches table variants
+            has_table_qualified_ref = False
+            for m in attr_regex.finditer(line):
+                qualifier = m.group(1).lower()
+                if qualifier in table_variant_lowers:
+                    has_table_qualified_ref = True
+                    break
+
+            if not has_table_qualified_ref:
+                for m in dict_regex.finditer(line):
+                    qualifier = m.group(1).lower()
+                    if qualifier in table_variant_lowers:
+                        has_table_qualified_ref = True
+                        break
 
             match_kind: DependencyMatchKind
-            if is_attr_ref or is_dict_ref:
+            if has_table_qualified_ref:
                 match_kind = DependencyMatchKind.QUALIFIED_REFERENCE
             else:
                 # Check for table in vicinity (+-2 lines window)
@@ -203,8 +272,17 @@ class DependencyAnalyzer:
                     match_kind = DependencyMatchKind.COLUMN_IDENTIFIER
 
             excerpt = redact_lines(line.strip())
+            ev_id = compute_evidence_id(
+                target.type.value,
+                target.table,
+                target.column,
+                document.path,
+                line_num,
+                match_kind.value,
+            )
             matches.append(
                 DependencyEvidence(
+                    id=ev_id,
                     target=target,
                     path=document.path,
                     line=line_num,
@@ -238,8 +316,17 @@ class DependencyAnalyzer:
                 continue
 
             excerpt = redact_lines(line.strip())
+            ev_id = compute_evidence_id(
+                target.type.value,
+                target.table,
+                None,
+                document.path,
+                line_num,
+                DependencyMatchKind.TABLE_IDENTIFIER.value,
+            )
             matches.append(
                 DependencyEvidence(
+                    id=ev_id,
                     target=target,
                     path=document.path,
                     line=line_num,

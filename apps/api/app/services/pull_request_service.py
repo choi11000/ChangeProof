@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 from app.analyzers.dependency import (
     DependencyAnalyzer,
+    build_change_facts,
     extract_dependency_targets,
     summarize_impact,
 )
@@ -131,8 +132,18 @@ class PullRequestService:
             sql_failure_count=sum(item.error is not None for item in sql_files),
         )
 
+        # Build change facts with stable IDs
+        change_facts = build_change_facts(sql_files)
+        completed_steps.append(AnalysisStep.BUILD_CHANGE_FACTS)
+        self._log_step(
+            AnalysisStep.BUILD_CHANGE_FACTS,
+            repository.full_name,
+            pull_request,
+            fact_count=len(change_facts),
+        )
+
         # Extract dependency targets
-        targets = extract_dependency_targets(sql_files)
+        targets = extract_dependency_targets(sql_files, change_facts)
         completed_steps.append(AnalysisStep.EXTRACT_DEPENDENCY_TARGETS)
         self._log_step(
             AnalysisStep.EXTRACT_DEPENDENCY_TARGETS,
@@ -195,6 +206,7 @@ class PullRequestService:
             pull_request=metadata,
             changed_files=classified,
             sql_files=sql_files,
+            change_facts=change_facts,
             dependency_targets=targets,
             dependency_evidence=evidences,
             impact_summary=impact_summary,

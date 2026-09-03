@@ -232,4 +232,6 @@ def test_source_file_too_large() -> None:
     _, snapshot = asyncio.run(run())
 
     assert len(snapshot.documents) == 0
+    assert snapshot.scan_complete is False
     assert any(w.code is AnalysisWarningCode.SOURCE_FILE_TOO_LARGE for w in snapshot.warnings)
+    assert any(w.code is AnalysisWarningCode.DEPENDENCY_SCAN_INCOMPLETE for w in snapshot.warnings)

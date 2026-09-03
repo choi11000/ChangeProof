@@ -10,11 +10,19 @@ class DependencyTargetType(StrEnum):
     COLUMN = "COLUMN"
 
 
+class ChangeFact(BaseModel):
+    id: str
+    sql_file_path: str
+    content_sha: str | None = None
+    statement_index: int = Field(ge=0)
+    change: SqlChange
+
+
 class DependencyTarget(BaseModel):
     type: DependencyTargetType
     table: str
     column: str | None = None
-    source_change: SqlChange
+    change_ids: list[str] = Field(default_factory=list)
 
 
 class SourceScope(StrEnum):
@@ -30,6 +38,7 @@ class DependencyMatchKind(StrEnum):
 
 
 class DependencyEvidence(BaseModel):
+    id: str
     target: DependencyTarget
     path: str
     line: int = Field(gt=0)

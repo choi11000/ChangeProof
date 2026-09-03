@@ -2,7 +2,12 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
-from app.schemas.dependency import DependencyEvidence, DependencyTarget, ImpactSummary
+from app.schemas.dependency import (
+    ChangeFact,
+    DependencyEvidence,
+    DependencyTarget,
+    ImpactSummary,
+)
 from app.schemas.sql_change import SqlChange
 
 
@@ -114,6 +119,7 @@ class AnalysisStep(StrEnum):
     CLASSIFY_FILES = "CLASSIFY_FILES"
     FETCH_SQL_CONTENT = "FETCH_SQL_CONTENT"
     ANALYZE_SQL = "ANALYZE_SQL"
+    BUILD_CHANGE_FACTS = "BUILD_CHANGE_FACTS"
     EXTRACT_DEPENDENCY_TARGETS = "EXTRACT_DEPENDENCY_TARGETS"
     FETCH_REPOSITORY_TREE = "FETCH_REPOSITORY_TREE"
     FETCH_APPLICATION_CONTENT = "FETCH_APPLICATION_CONTENT"
@@ -126,6 +132,7 @@ class PullRequestAnalysis(BaseModel):
     pull_request: PullRequestMetadata
     changed_files: list[ClassifiedFile]
     sql_files: list[SqlFileAnalysis]
+    change_facts: list[ChangeFact] = Field(default_factory=list)
     dependency_targets: list[DependencyTarget] = Field(default_factory=list)
     dependency_evidence: list[DependencyEvidence] = Field(default_factory=list)
     impact_summary: ImpactSummary | None = None

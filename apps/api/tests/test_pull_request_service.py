@@ -171,9 +171,12 @@ def test_dependency_discovery_finds_unchanged_application_references() -> None:
 
     result = asyncio.run(scenario())
 
+    assert len(result.change_facts) == 1
+    assert result.change_facts[0].id.startswith("change_")
     assert len(result.dependency_targets) == 1
     target = result.dependency_targets[0]
     assert (target.table, target.column) == ("orders", "legacy_status")
+    assert target.change_ids == [result.change_facts[0].id]
 
     # Critical Phase 4 verification:
     # app/order_service.py was NOT in PR changed files, but its reference is discovered!
@@ -184,6 +187,7 @@ def test_dependency_discovery_finds_unchanged_application_references() -> None:
     )
     assert qualified_evidence.path == "app/order_service.py"
     assert qualified_evidence.changed_in_pull_request is False
+    assert qualified_evidence.id.startswith("ev_")
     assert "order.legacy_status" in qualified_evidence.excerpt
 
     assert result.impact_summary is not None
@@ -197,6 +201,7 @@ def test_dependency_discovery_finds_unchanged_application_references() -> None:
         AnalysisStep.CLASSIFY_FILES,
         AnalysisStep.FETCH_SQL_CONTENT,
         AnalysisStep.ANALYZE_SQL,
+        AnalysisStep.BUILD_CHANGE_FACTS,
         AnalysisStep.EXTRACT_DEPENDENCY_TARGETS,
         AnalysisStep.FETCH_REPOSITORY_TREE,
         AnalysisStep.FETCH_APPLICATION_CONTENT,
