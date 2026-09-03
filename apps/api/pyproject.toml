@@ -15,6 +15,7 @@ dependencies = [
   "sqlalchemy==2.0.43",
   "sqlglot==30.17.0",
   "uvicorn[standard]==0.35.0",
+  "openai==1.66.5",
 ]
 
 [project.optional-dependencies]

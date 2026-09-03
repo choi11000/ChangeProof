@@ -12,6 +12,8 @@ class Settings(BaseSettings):
         "postgresql+psycopg://changeproof:changeproof@localhost:5433/changeproof_sandbox"
     )
     github_token: str | None = None
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4o-mini"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

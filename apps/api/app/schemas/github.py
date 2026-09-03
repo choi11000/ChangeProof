@@ -8,6 +8,8 @@ from app.schemas.dependency import (
     DependencyTarget,
     ImpactSummary,
 )
+from app.schemas.experiment import ExperimentPlan
+from app.schemas.hypothesis import FailureHypothesis
 from app.schemas.sql_change import SqlChange
 
 
@@ -105,6 +107,11 @@ class AnalysisWarningCode(StrEnum):
     SOURCE_FILE_TOO_LARGE = "SOURCE_FILE_TOO_LARGE"
     SOURCE_CONTENT_UNAVAILABLE = "SOURCE_CONTENT_UNAVAILABLE"
     DEPENDENCY_SCAN_INCOMPLETE = "DEPENDENCY_SCAN_INCOMPLETE"
+    AI_NOT_CONFIGURED = "AI_NOT_CONFIGURED"
+    AI_REQUEST_FAILED = "AI_REQUEST_FAILED"
+    AI_RATE_LIMITED = "AI_RATE_LIMITED"
+    AI_OUTPUT_INVALID = "AI_OUTPUT_INVALID"
+    HYPOTHESIS_GENERATION_SKIPPED = "HYPOTHESIS_GENERATION_SKIPPED"
 
 
 class AnalysisWarning(BaseModel):
@@ -125,6 +132,9 @@ class AnalysisStep(StrEnum):
     FETCH_APPLICATION_CONTENT = "FETCH_APPLICATION_CONTENT"
     DISCOVER_DEPENDENCIES = "DISCOVER_DEPENDENCIES"
     SUMMARIZE_IMPACT = "SUMMARIZE_IMPACT"
+    GENERATE_FAILURE_HYPOTHESES = "GENERATE_FAILURE_HYPOTHESES"
+    VALIDATE_HYPOTHESES = "VALIDATE_HYPOTHESES"
+    COMPILE_EXPERIMENT_PLANS = "COMPILE_EXPERIMENT_PLANS"
 
 
 class PullRequestAnalysis(BaseModel):
@@ -136,6 +146,8 @@ class PullRequestAnalysis(BaseModel):
     dependency_targets: list[DependencyTarget] = Field(default_factory=list)
     dependency_evidence: list[DependencyEvidence] = Field(default_factory=list)
     impact_summary: ImpactSummary | None = None
+    failure_hypotheses: list[FailureHypothesis] = Field(default_factory=list)
+    experiment_plans: list[ExperimentPlan] = Field(default_factory=list)
     warnings: list[AnalysisWarning] = Field(default_factory=list)
     completed_steps: list[AnalysisStep] = Field(default_factory=list)
 
