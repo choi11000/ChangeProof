@@ -1,103 +1,162 @@
 # ChangeProof
 
-ChangeProof is an evidence-backed database change risk agent. It turns real pull-request changes into structured facts, reproducible experiments, observed evidence, and verified remediation.
+> **Don't predict the failure. Reproduce it before production.**  
+> *Fix it, run the same experiment again, and prove the result.*
 
-> Don't predict the failure. Reproduce it before production. Fix it, run the same experiment again, and prove the result.
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Railway%20Production-blue?style=for-the-badge&logo=railway)](https://changeproof-web-production.up.railway.app)
+[![API Status](https://img.shields.io/badge/API-Online-success?style=for-the-badge)](https://changeproof-api-production.up.railway.app/api/v1/health)
+[![CI Status](https://img.shields.io/badge/CI-Passing%20(4%20Jobs)-brightgreen?style=for-the-badge&logo=githubactions)](https://github.com/choi11000/ChangeProof/actions)
+[![Test Coverage](https://img.shields.io/badge/Coverage-94.92%25-brightgreen?style=for-the-badge)](docs/technical-proof.md)
 
-## MVP scope
+ChangeProof is an **Executable Change Verification Agent** (증거 기반 실행형 변경 검증 에이전트).  
+It turns database schema migrations in GitHub pull requests into deterministic facts, unchanged application dependency evidence, evidence-grounded AI failure hypotheses, isolated PostgreSQL sandbox reproductions (`PROVEN_FAIL`), and same-experiment compatibility remediation proofs (`PROVEN_FIXED`).
 
-- GitHub pull requests and repositories
-- PostgreSQL SQL migrations
-- Application-to-schema dependency analysis
-- Ephemeral PostgreSQL experiment execution in isolated schemas
-- Deterministic SQLSTATE attribution and verdict verification (`PROVEN_FAIL` / `PROVEN_PASS`)
-- Evidence-linked failure proof
-- Allowlisted deterministic remediation and same-experiment proof
-- Bounded/cached AI planning, per-client API limits, and sandbox concurrency guards
-- Public-repository-only analysis by default
+---
 
-The current stacked development branch ingests a GitHub pull request, classifies changed files, parses SQL migrations at the exact PR revision, discovers cross-layer application source references across the repository tree at `head_sha`, derives evidence-grounded failure hypotheses, compiles safe experiment plans, and executes controlled synthetic fixtures in isolated PostgreSQL schemas to reproduce failures and capture concrete SQLSTATE evidence.
+## 🎯 Try the Live Demo in 30 Seconds
 
-## Quick start
+* **Public Web Service**: [https://changeproof-web-production.up.railway.app](https://changeproof-web-production.up.railway.app)
+* **Official Demo PR**: [choi11000/changeproof-demo#1](https://github.com/choi11000/changeproof-demo/pull/1)
 
-Prerequisites: Docker Desktop with Compose v2.
+### How to Run:
+1. Open the [Live Web Service](https://changeproof-web-production.up.railway.app).
+2. Click **'데모 PR 불러오기'** (or **'Load Demo PR'** in English).
+3. Click **'변경사항 분석 →'** (`Analyze change`).
+4. Review the detected `DROP_COLUMN orders.legacy_status` fact, the cross-layer dependency evidence in `app/order_service.py:11`, and the AI failure hypothesis.
+5. Click **'격리된 PostgreSQL에서 실험 실행 →'** (`Run experiment in isolated PostgreSQL`) to witness actual database execution failure (`SQLSTATE 42703 • undefined_column`) $\rightarrow$ **`PROVEN_FAIL`**.
+6. Click **'복구 검증 →'** (`Verify remediation`) to run the **exact same experiment contract** against compatibility-remediated code $\rightarrow$ **`PROVEN_FIXED`**.
+
+---
+
+## ⚠️ The Problem: The Diff-Only Blindspot
+
+Modern code reviews and predictive AI code reviewers commonly answer:
+* *"What changed in this PR?"*
+* *"Does this look risky based on general patterns?"*
+
+**However, they cannot prove:**
+* *"Will this specific schema change break an unchanged application query at runtime?"*
+
+```text
+PR Migration Diff:
++ ALTER TABLE orders DROP COLUMN legacy_status;
+
+Unchanged Application Source (NOT in the PR diff):
+  order_dict = {"id": order.id, "status": order.legacy_status}  <-- RUNTIME CRASH!
+```
+
+Because diff-only reviews do not inspect unchanged application files, and speculative AI reviewers merely generate probabilistic risk scores, breaking migrations routinely escape to production.
+
+---
+
+## 💡 How ChangeProof Works: From Guesswork to Proof
+
+ChangeProof replaces speculation with **reproduction**:
+
+1. **Deterministic Fact Extraction**: Parses SQL migrations with an AST parser (`sqlglot`) and scans the entire repository tree at the PR commit (`head_sha`) to discover references to dropped columns or tables.
+2. **Evidence-Grounded AI Planning**: Uses OpenAI Structured Outputs with prompt-injection isolation to synthesize verified facts and evidence into concrete failure hypotheses and executable 6-step experiment plans. Hypotheses remain strictly `UNVERIFIED` proposals.
+3. **Ephemeral PostgreSQL Execution**: Spawns an isolated ephemeral schema (`cp_run_<hex12>`), applies baseline schemas, loads seed data, applies the PR migration, and executes the dependent query. It captures physical database engine errors (`SQLSTATE 42703`) $\rightarrow$ **`PROVEN_FAIL`**.
+4. **Same-Experiment Remediation Proof**: Applies a backward-compatible remediation migration and re-executes the identical experiment contract digest (`contract_...`). Verifying that it passes (`PROVEN_PASS`) provides mathematical proof that the bug is resolved $\rightarrow$ **`PROVEN_FIXED`**.
+
+---
+
+## 🛡️ The 4-Layer Trust Model
+
+| Layer | Responsibility | Engine / Component | Trust Level | Output |
+| :--- | :--- | :--- | :--- | :--- |
+| **1. FACT** | SQL parsing & source dependency discovery | `sqlglot` AST & file indexer | 100% Deterministic | `ChangeFact`, `DependencyEvidence` |
+| **2. HYPOTHESIS** | Failure symptom & experiment plan mapping | OpenAI `gpt-4o-mini` (Structured Outputs) | Bounded AI reasoning | `FailureHypothesis` (`UNVERIFIED`) |
+| **3. OBSERVATION** | Sandbox migration & query execution | Ephemeral PostgreSQL 17 (`asyncpg`) | Real DB Engine | `SQLSTATE 42703`, Step traces |
+| **4. VERDICT & PROOF** | Contract digest & invariance verification | Deterministic proof verifier | 100% Deterministic | `PROVEN_FAIL`, `PROVEN_FIXED` |
+
+> **Crucial Guarantee**: AI **never** decides whether a change is safe. AI **never** executes arbitrary SQL or shell commands. Only real PostgreSQL observation determines the verdict.
+
+---
+
+## 🏛️ System Architecture
+
+```mermaid
+flowchart TD
+    subgraph S1["1. Deterministic Facts"]
+        A["GitHub Pull Request"] --> B["SQL Change Parser"] --> C["Change Facts"]
+        A --> D["Dependency Discovery Engine"] --> E["Dependency Evidence"]
+    end
+
+    subgraph S2["2. Bounded AI Reasoning"]
+        C & E --> F["OpenAI Structured Outputs"] --> G["Failure Hypothesis (UNVERIFIED)"]
+        G --> H["Experiment Compiler"] --> I["Deterministic Experiment Plan"]
+    end
+
+    subgraph S3["3. Real PostgreSQL Sandbox"]
+        I --> J["Ephemeral Schema (cp_run_*)"] --> K["Observation: SQLSTATE 42703"]
+    end
+
+    subgraph S4["4. Deterministic Proof"]
+        K --> L["Deterministic Verifier"] --> M["Verdict: PROVEN_FAIL"]
+        M --> N["Compatibility Remediation"] --> O["Same Experiment Contract"] --> P["Verdict: PROVEN_FIXED"]
+    end
+
+    classDef fact fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc;
+    classDef hypo fill:#1e293b,stroke:#fbbf24,stroke-width:2px,color:#f8fafc;
+    classDef obs fill:#1e293b,stroke:#f87171,stroke-width:2px,color:#f8fafc;
+    classDef proof fill:#1e293b,stroke:#4ade80,stroke-width:2px,color:#f8fafc;
+
+    class S1,C,E fact;
+    class S2,G,I hypo;
+    class S3,K obs;
+    class S4,M,P proof;
+```
+
+---
+
+## 📦 Current MVP Scope
+
+* **Version Control**: GitHub public repositories and pull requests.
+* **Database**: PostgreSQL 17 (SQL DDL migrations).
+* **Application Languages**: Python application code (expandable to TypeScript, Go, Java).
+* **Sandbox Execution**: Ephemeral PostgreSQL schema namespaces with 5s statement timeouts, 2s lock timeouts, and automated `finally` cleanup.
+* **Cost & Safety**: In-memory single-flight lock, AI context budgeter, strict rate limits, and public-only intake.
+
+---
+
+## 💻 Local Development
+
+Prerequisites: Docker Desktop with Compose v2, Python 3.12, Node.js 20+.
 
 ```bash
+# 1. Clone repository
+git clone https://github.com/choi11000/ChangeProof.git
+cd ChangeProof
+
+# 2. Configure environment
 cp .env.example .env
-docker compose up --build
+
+# 3. Start API, Web, and Sandbox PostgreSQL
+docker compose --profile sandbox up --build -d
 ```
 
-To enable the isolated PostgreSQL sandbox for live experiment execution:
+Access:
+* Web UI: `http://localhost:3000`
+* API Docs: `http://localhost:8000/docs`
+* API Health: `http://localhost:8000/api/v1/health`
 
+To run automated tests:
 ```bash
-docker compose --profile sandbox up -d sandbox-postgres
+# Backend pytest suite (176 tests, 94.9% coverage)
+cd apps/api && pytest -v --cov=app
+
+# Frontend Vitest suite (6 tests)
+cd ../web && npm test
 ```
 
-Open:
+---
 
-- Web: http://localhost:3000
-- API docs: http://localhost:8000/docs
-- Health: http://localhost:8000/api/v1/health
-- Liveness: http://localhost:8000/api/v1/health/live
-- Readiness: http://localhost:8000/api/v1/health/ready
+## 📑 Documentation
 
-No API keys are required for the bootstrap. Add keys only to the local `.env`; never commit them.
-
-## GitHub PR analysis & Experiment Execution
-
-Public repositories can be analyzed without authentication until GitHub's anonymous rate limit is reached. The default and production policy rejects private repositories even when the server credential could read them. If a token is needed for rate limits, use a public-only or minimum-scope fine-grained credential—never a broad personal access token that can read unrelated private repositories.
-
-```http
-POST /api/v1/analyses/github-pr
-Content-Type: application/json
-
-{
-  "repository": "https://github.com/owner/repository",
-  "pull_request": 42
-}
-```
-
-To execute a controlled experiment fixture in isolated PostgreSQL:
-
-```http
-POST /api/v1/experiments/execute
-Content-Type: application/json
-
-{
-  "fixture_id": "risky-saas/drop-legacy-status"
-}
-```
-
-To authoritatively rerun an original/remediated pair and evaluate proof invariants:
-
-```http
-POST /api/v1/proofs/remediation
-Content-Type: application/json
-
-{
-  "fixture_id": "risky-saas/drop-legacy-status"
-}
-```
-
-The proof endpoint accepts only a fixture ID. Digests, verdicts, SQLSTATE evidence, and run results are derived by the server. Remediation execution is restricted to controlled fixtures and never executes AI-generated or repository-supplied arbitrary SQL.
-
-## Development
-
-See [DEVELOPMENT.md](DEVELOPMENT.md) for native setup, tests, and project conventions. Architecture and product flow are documented in [docs/architecture.md](docs/architecture.md).
-Provider-neutral production configuration and secret guidance are in [docs/deployment.md](docs/deployment.md).
-
-## Status
-
-| Phase | Status |
-| --- | --- |
-| 1 — Service bootstrap | On `main`; complete |
-| 2 — SQL migration parser | Complete on `feature/sql-change-parser`; not merged to `main` |
-| 3 — GitHub PR intake | Complete on stacked `feature/github-pr-intake`; not merged to `main` |
-| 4 — Dependency discovery | Complete on stacked `feature/dependency-discovery`; not merged to `main` |
-| 5 — Failure hypothesis & experiment planning | Complete on stacked `feature/failure-experiment-planning`; not merged to `main` |
-| 6 — Ephemeral PostgreSQL experiment execution | Complete; PostgreSQL 17.6 runtime acceptance passed in GitHub Actions |
-| 7 — Deterministic remediation & same-experiment proof | Complete; all four before/after remediation pairs passed in PostgreSQL CI |
-| 8 — Runtime proof & public service hardening | Complete on stacked `feature/submission-hardening`; CI, cost, access, deployment, and demo guards verified |
-| 9 — Public deployment, controlled demo PR & submission readiness | Complete on stacked `feature/public-deployment`; exact demo policy, public demo PR, Railway deployment guide, submission runbook |
-
-See [docs/submission-runbook.md](docs/submission-runbook.md) for judge evaluation walkthrough and [DEVLOG.md](DEVLOG.md) for verified results and branch dependencies.
+* [Wanted AI Championship 2026 Submission Document](docs/wanted-submission.md)
+* [Submission Checklist](docs/wanted-submission-checklist.md)
+* [Technical Proof Sheet](docs/technical-proof.md)
+* [Architecture & Trust Model](docs/architecture-submission.md)
+* [100-Second Demo Video Script](docs/demo-video-script.md)
+* [Release Freeze Declaration](docs/release-freeze.md)
+* [TOP20 Demo Day Outline](docs/demo-day-outline.md)

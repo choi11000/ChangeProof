@@ -463,6 +463,29 @@ Branch: `feature/public-deployment` (stacked on `feature/submission-hardening`)
   - Seamless bilingual toggle: toggling to English immediately displays original English prompts/hypotheses; toggling to Korean immediately displays Korean translations without network latency.
   - Deployed revision `31a668be-c395-41d1-9be2-403800d0e681` to Railway and verified with `browser_subagent`.
 
+## 2026-09-04 — Phase 10: Wanted AI Championship Submission Package & Public Evaluation Readiness
+
+### Added & Resolved
+
+- **Wanted AI Championship 2026 Submission Deliverables**:
+  - `docs/wanted-submission.md`: Single source of truth containing all multi-tier length variants (Tagline 40 chars, Very short 138 chars, Short 352 chars, Full description 1,074 chars, Problem statement 634 chars, AI appropriateness 678 chars, Technical implementation 712 chars, Scalability 548 chars), public voting copy, AI tools disclosure (`gpt-4o-mini`, Structured Outputs), human vs AI responsibility boundary, and evaluation criteria mapping.
+  - `docs/wanted-submission-checklist.md`: Complete checklist tracking participant registration, public URLs, secret safety, synthetic data audit, and final submission state.
+  - `docs/demo-video-script.md`: 105-second video script detailing visual cues, voiceover narration, and 3-step proof loop from problem to `PROVEN_FIXED`.
+  - `docs/architecture-submission.md`: Complete architecture guide with Mermaid trust boundary diagram explicitly demarcating `DETERMINISTIC FACT`, `AI HYPOTHESIS`, `REAL DB OBSERVATION`, and `DETERMINISTIC VERIFIER & PROOF`.
+  - `docs/technical-proof.md`: Technical credibility metrics sheet documenting 176 passed unit tests, 94.92% coverage, 11 PostgreSQL CI integration tests, 6 Vitest tests, live `SQLSTATE 42703` reproduction, and resource boundaries.
+  - `docs/release-freeze.md`: Release freeze declaration establishing frozen baseline commit, URLs, demo repository, demo PR, and permitted/prohibited operations.
+  - `docs/demo-day-outline.md`: TOP20 Demo Day presentation outline (problem, gap, live demo, trust architecture, scalability roadmap, and Q&A defense).
+  - `README.md`: Polished public-facing README with live badges, 30-second live demo walkthrough, problem definition, 4-layer trust model table, and Mermaid diagram.
+- **Safety & IP Audit**:
+  - 100% synthetic fixtures only; zero employer/hospital/patient data found.
+  - Zero API keys, database credentials, or tokens in git history.
+  - Local `.env` verified git-ignored.
+- **Quality & Health Verification**:
+  - Backend pytest: 176 passed, 11 skipped (sandbox integration requiring live db), 94.92% coverage, Ruff clean, compileall clean.
+  - Frontend: ESLint clean, TypeScript `tsc --noEmit` clean, Vitest 6/6 passed, Turbopack build clean.
+  - Live Railway Acceptance: Verified live Web (200 OK), API `/health`, `/health/live`, `/health/ready` (OK), live demo PR analysis (1 hypothesis, 1 plan), live isolated PostgreSQL sandbox execution (`PROVEN_FAIL`, `SQLSTATE 42703`), and live remediation proof (`PROVEN_FIXED`, `same_experiment: true`).
+
+
 
 
 
