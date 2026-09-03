@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     github_token: str | None = None
     openai_api_key: str | None = None
     openai_model: str = "gpt-4o-mini"
+    require_sandbox_tests: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -30,6 +30,11 @@ class TestSandboxPostgresIntegration:
     @pytest.fixture(autouse=True)
     def check_sandbox(self):
         if not sandbox_available:
+            if get_settings().require_sandbox_tests:
+                pytest.fail(
+                    "Sandbox PostgreSQL is required but unavailable at the configured "
+                    "SANDBOX_DATABASE_URL"
+                )
             pytest.skip(
                 "Sandbox PostgreSQL is not running on localhost:5433. "
                 "Start with 'docker compose --profile sandbox up -d sandbox-postgres'"
