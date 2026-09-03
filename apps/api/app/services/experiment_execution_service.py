@@ -1,5 +1,6 @@
 import logging
 import uuid
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from app.executors.postgres_experiment import (
     PostgresExperimentExecutor,
 )
 from app.fixtures.experiment_registry import (
+    ControlledExperimentFixture,
     get_controlled_fixture,
     get_repo_root,
 )
@@ -52,8 +54,25 @@ class ExperimentExecutionService:
                 "Execution is strictly restricted to controlled fixtures."
             )
 
+        return self.execute_controlled_fixture(
+            fixture,
+            experiment_plan_id=request.experiment_plan_id,
+            subject_variant="original",
+        )
+
+    def execute_controlled_fixture(
+        self,
+        fixture: ControlledExperimentFixture,
+        *,
+        experiment_plan_id: str | None = None,
+        subject_variant: str,
+        migration_path: str | None = None,
+    ) -> ExperimentRun:
+        executable_fixture = (
+            replace(fixture, migration_path=migration_path) if migration_path else fixture
+        )
         started_at = datetime.now(UTC)
-        execution = self.executor.execute_fixture(fixture, repo_root=self.repo_root)
+        execution = self.executor.execute_fixture(executable_fixture, repo_root=self.repo_root)
         if isinstance(execution, list):
             execution = FixtureExecutionResult(execution, None)
         finished_at = datetime.now(UTC)
@@ -64,10 +83,10 @@ class ExperimentExecutionService:
             expected_sqlstate=fixture.expected_sqlstate,
         )
 
-        plan_id = request.experiment_plan_id or f"plan_{fixture.id.replace('/', '_')}"
+        plan_id = experiment_plan_id or f"plan_{fixture.id.replace('/', '_')}"
         baseline_schema = fixture.read_baseline_schema(self.repo_root)
         seed_data = fixture.read_seed_data(self.repo_root)
-        migration = fixture.read_migration(self.repo_root)
+        migration = executable_fixture.read_migration(self.repo_root)
         contract_digest = compute_experiment_contract_digest(
             fixture,
             baseline_schema=baseline_schema,
@@ -78,7 +97,7 @@ class ExperimentExecutionService:
             id=f"run_{uuid.uuid4().hex[:12]}",
             experiment_plan_id=plan_id,
             experiment_contract_digest=contract_digest,
-            subject_digest=compute_subject_digest(migration, variant="original"),
+            subject_digest=compute_subject_digest(migration, variant=subject_variant),
             template=fixture.template,
             verdict=verdict,
             started_at=started_at,

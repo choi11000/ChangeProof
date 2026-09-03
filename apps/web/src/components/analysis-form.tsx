@@ -138,6 +138,22 @@ type ExperimentRun = {
   summary: string;
 };
 
+type RemediationProof = {
+  id: string;
+  fixture_id: string;
+  remediation_id: string;
+  strategy: string;
+  description: string;
+  experiment_contract_digest: string;
+  before: ExperimentRun;
+  after: ExperimentRun;
+  verdict: "PROVEN_FIXED" | "NOT_FIXED" | "INCONCLUSIVE" | "EXECUTION_ERROR";
+  same_experiment: boolean;
+  subject_changed: boolean;
+  summary: string;
+  scope_notice: string;
+};
+
 type AnalysisResult = {
   pull_request: { number: number; title: string; changed_files: number; html_url: string };
   changed_files: Array<{
@@ -190,6 +206,8 @@ export function AnalysisForm() {
   const [executingPlanId, setExecutingPlanId] = useState<string | null>(null);
   const [experimentRuns, setExperimentRuns] = useState<Record<string, ExperimentRun>>({});
   const [executionError, setExecutionError] = useState<string | null>(null);
+  const [provingPlanId, setProvingPlanId] = useState<string | null>(null);
+  const [remediationProofs, setRemediationProofs] = useState<Record<string, RemediationProof>>({});
 
   const counts = useMemo(() => {
     const files = result?.changed_files ?? [];
@@ -211,6 +229,7 @@ export function AnalysisForm() {
     setResult(null);
     setExperimentRuns({});
     setExecutionError(null);
+    setRemediationProofs({});
     try {
       const response = await fetch(`${apiUrl}/api/v1/analyses/github-pr`, {
         method: "POST",
@@ -253,6 +272,29 @@ export function AnalysisForm() {
       setExecutionError(err instanceof Error ? err.message : "Experiment execution failed");
     } finally {
       setExecutingPlanId(null);
+    }
+  }
+
+  async function verifyRemediation(fixtureId: string, planId: string) {
+    setProvingPlanId(planId);
+    setExecutionError(null);
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/proofs/remediation`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fixture_id: fixtureId }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body.detail ?? "Remediation proof failed");
+      }
+      setRemediationProofs((previous) => ({ ...previous, [planId]: body.proof }));
+    } catch (requestError) {
+      setExecutionError(
+        requestError instanceof Error ? requestError.message : "Remediation proof failed",
+      );
+    } finally {
+      setProvingPlanId(null);
     }
   }
 
@@ -429,6 +471,9 @@ export function AnalysisForm() {
                     (p) => p.hypothesis_id === hypothesis.id,
                   );
                   const executionRun = matchingPlan ? experimentRuns[matchingPlan.id] : null;
+                  const remediationProof = matchingPlan
+                    ? remediationProofs[matchingPlan.id]
+                    : null;
 
                   return (
                     <article key={hypothesis.id} className="hypothesis-card">
@@ -577,6 +622,72 @@ export function AnalysisForm() {
                                 <br />
                                 Cleanup: {executionRun.cleanup_succeeded === true ? "SUCCEEDED" : executionRun.cleanup_succeeded === false ? "FAILED" : "UNKNOWN"}
                               </div>
+                            </div>
+                          )}
+
+                          {executionRun && result.execution_allowed && result.controlled_fixture_id && (
+                            <div className="remediation-card" aria-label="Remediation">
+                              <p className="eyebrow">REMEDIATION</p>
+                              {executionRun.verdict === "PROVEN_PASS" ? (
+                                <p>No remediation required for this experiment.</p>
+                              ) : executionRun.verdict === "PROVEN_FAIL" ? (
+                                <>
+                                  <h5>Deterministic compatibility remediation</h5>
+                                  <p>
+                                    This allowlisted remediation will be validated against the same experiment.
+                                  </p>
+                                  {!remediationProof && (
+                                    <button
+                                      type="button"
+                                      className="btn-run-experiment"
+                                      disabled={provingPlanId === matchingPlan.id}
+                                      onClick={() =>
+                                        verifyRemediation(
+                                          result.controlled_fixture_id!,
+                                          matchingPlan.id,
+                                        )
+                                      }
+                                    >
+                                      {provingPlanId === matchingPlan.id
+                                        ? "Running authoritative before and after experiments..."
+                                        : "Verify remediation →"}
+                                    </button>
+                                  )}
+                                </>
+                              ) : (
+                                <p>Remediation verification requires a conclusive reproduced failure.</p>
+                              )}
+
+                              {remediationProof && (
+                                <div className="remediation-proof" aria-label="Remediation Proof">
+                                  <span className={`badge ${remediationProof.verdict === "PROVEN_FIXED" ? "badge-pass" : "badge-inconclusive"}`}>
+                                    {remediationProof.verdict.replace("_", " ")}
+                                  </span>
+                                  <h5>{remediationProof.description}</h5>
+                                  <div className="proof-comparison">
+                                    <div>
+                                      <strong>Before</strong>
+                                      <span>{remediationProof.before.verdict.replace("_", " ")}</span>
+                                      <code>
+                                        SQLSTATE {remediationProof.before.step_results.find((step) => step.sql_state)?.sql_state ?? "N/A"}
+                                      </code>
+                                    </div>
+                                    <div>
+                                      <strong>Same experiment</strong>
+                                      <span>Contract: {remediationProof.experiment_contract_digest.slice(0, 20)}...</span>
+                                    </div>
+                                    <div>
+                                      <strong>After</strong>
+                                      <span>{remediationProof.after.verdict.replace("_", " ")}</span>
+                                    </div>
+                                  </div>
+                                  <p className="proof-invariants">
+                                    Same experiment: {remediationProof.same_experiment ? "YES" : "NO"} · Subject changed: {remediationProof.subject_changed ? "YES" : "NO"}
+                                  </p>
+                                  <p className="proof-demo-message">{remediationProof.summary}</p>
+                                  <p className="run-subnote">{remediationProof.scope_notice}</p>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

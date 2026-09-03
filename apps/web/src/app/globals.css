@@ -205,6 +205,16 @@ h2 { font-size: clamp(30px, 4vw, 50px); margin: 12px 0 0; letter-spacing: -.05em
   border-top: 1px dashed #2a352c;
   padding-top: 10px;
 }
+.remediation-card { margin-top: 16px; padding: 18px 20px; background: #10120c; border: 1px solid #495a27; border-radius: 8px; }
+.remediation-card h5 { margin: 8px 0; font-size: 16px; color: var(--acid); }
+.remediation-card p { color: #d1d5db; line-height: 1.5; }
+.remediation-proof { margin-top: 16px; padding: 18px; background: #081109; border: 1px solid #2e6b36; border-radius: 8px; }
+.proof-comparison { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 16px 0; }
+.proof-comparison div { display: grid; gap: 6px; padding: 12px; background: #060807; border-radius: 6px; }
+.proof-comparison strong { color: var(--acid); }
+.proof-comparison span, .proof-comparison code { font: 12px monospace; color: #d1d5db; word-break: break-all; }
+.proof-invariants { font: 12px monospace; color: var(--acid) !important; }
+.proof-demo-message { font-weight: 700; color: white !important; }
 
-@media (max-width: 760px) { .hero { padding-top: 72px; } .analysis-card { grid-template-columns: 1fr; } .wide { grid-column: auto; } button { width: 100%; } .pipeline, .result-counts { grid-template-columns: 1fr 1fr; } .proof { align-items: flex-start; flex-direction: column; } .principle-card { width: 100%; } }
+@media (max-width: 760px) { .hero { padding-top: 72px; } .analysis-card { grid-template-columns: 1fr; } .wide { grid-column: auto; } button { width: 100%; } .pipeline, .result-counts, .proof-comparison { grid-template-columns: 1fr; } .proof { align-items: flex-start; flex-direction: column; } .principle-card { width: 100%; } }
 

@@ -298,6 +298,54 @@ describe("Home", () => {
       ),
     );
 
+    // 3. Authoritative remediation proof response
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          proof: {
+            id: "proof_001",
+            fixture_id: "risky-saas/drop-legacy-status",
+            remediation_id: "remediation/risky-saas/preserve-legacy-status",
+            strategy: "PRESERVE_COLUMN_COMPATIBILITY",
+            description: "Preserve legacy_status during the compatibility window while adding status.",
+            experiment_contract_digest: "contract_a1b2c3d4e5f67890",
+            before: {
+              id: "run_before",
+              experiment_plan_id: "plan_001",
+              experiment_contract_digest: "contract_a1b2c3d4e5f67890",
+              subject_digest: "subject_before",
+              cleanup_succeeded: true,
+              template: "DROPPED_COLUMN_REFERENCE",
+              verdict: "PROVEN_FAIL",
+              started_at: "2026-09-03T00:00:00Z",
+              finished_at: "2026-09-03T00:00:01Z",
+              step_results: [{ order: 5, type: "RUN_READ_QUERY", status: "FAILED", duration_ms: 1, sql_state: "42703" }],
+              summary: "Failure reproduced.",
+            },
+            after: {
+              id: "run_after",
+              experiment_plan_id: "plan_001",
+              experiment_contract_digest: "contract_a1b2c3d4e5f67890",
+              subject_digest: "subject_after",
+              cleanup_succeeded: true,
+              template: "DROPPED_COLUMN_REFERENCE",
+              verdict: "PROVEN_PASS",
+              started_at: "2026-09-03T00:00:01Z",
+              finished_at: "2026-09-03T00:00:02Z",
+              step_results: [],
+              summary: "Verification passed.",
+            },
+            verdict: "PROVEN_FIXED",
+            same_experiment: true,
+            subject_changed: true,
+            summary: "Failure reproduced before remediation. The same experiment passed after remediation.",
+            scope_notice: "This proof applies to this controlled experiment, not to the entire pull request or production system.",
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
     render(<Home />);
 
     fireEvent.change(screen.getByLabelText(/github repository/i), {
@@ -325,5 +373,12 @@ describe("Home", () => {
     expect(screen.getByText(/SQLSTATE: 42703/)).toBeInTheDocument();
     expect(screen.getByText("contract_a1b2c3d4e5f67890")).toBeInTheDocument();
     expect(screen.getByText("subject_a1b2c3d4e5f67890")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /verify remediation/i }));
+    await waitFor(() => expect(screen.getByText("PROVEN FIXED")).toBeInTheDocument());
+    expect(screen.getByText(/same experiment: yes/i)).toBeInTheDocument();
+    expect(screen.getByText(/subject changed: yes/i)).toBeInTheDocument();
+    expect(screen.getByText(/the same experiment passed after remediation/i)).toBeInTheDocument();
+    expect(screen.getByText(/not to the entire pull request/i)).toBeInTheDocument();
   });
 });
