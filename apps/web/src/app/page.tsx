@@ -1,3 +1,5 @@
+import { AnalysisForm } from "@/components/analysis-form";
+
 const stages = ["Understand", "Dependencies", "Validate", "Evidence", "Remediate"];
 
 export default function Home() {
@@ -16,17 +18,7 @@ export default function Home() {
           and a remediation you can verify.
         </p>
 
-        <form className="analysis-card">
-          <div className="field wide">
-            <label htmlFor="repository">GitHub repository</label>
-            <input id="repository" placeholder="https://github.com/acme/risky-saas" type="url" />
-          </div>
-          <div className="field">
-            <label htmlFor="pr">Pull request</label>
-            <input id="pr" min="1" placeholder="42" type="number" />
-          </div>
-          <button type="submit">Analyze change <span>→</span></button>
-        </form>
+        <AnalysisForm />
 
         <ol className="pipeline" aria-label="Analysis pipeline">
           {stages.map((stage, index) => (
@@ -40,10 +32,10 @@ export default function Home() {
           <p className="eyebrow">DETERMINISTIC BY DESIGN</p>
           <h2>Reasoning makes a hypothesis.<br />Evidence earns the verdict.</h2>
         </article>
-        <div className="score-card">
-          <div><small>BEFORE</small><strong>87</strong><span className="high">HIGH</span></div>
-          <span className="arrow">→</span>
-          <div><small>AFTER FIX</small><strong>12</strong><span className="low">LOW</span></div>
+        <div className="principle-card">
+          <small>CURRENT CAPABILITY</small>
+          <strong>PR → structured change facts</strong>
+          <p>No invented risk score. Every fact starts with source we can inspect.</p>
         </div>
       </section>
     </main>
