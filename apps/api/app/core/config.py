@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     cors_allowed_origins: str = "http://localhost:3000"
     api_docs_enabled: bool = True
     require_sandbox_tests: bool = False
+    controlled_demo_repository: str | None = "choi11000/changeproof-demo"
+    controlled_demo_pr: int | None = 1
+    controlled_demo_head_sha: str | None = "08302ccf5e67d12eee0d6470ac1136f4f644cba5"
+    port: int = 8000
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

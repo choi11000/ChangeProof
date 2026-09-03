@@ -98,5 +98,6 @@ Provider-neutral production configuration and secret guidance are in [docs/deplo
 | 6 — Ephemeral PostgreSQL experiment execution | Complete; PostgreSQL 17.6 runtime acceptance passed in GitHub Actions |
 | 7 — Deterministic remediation & same-experiment proof | Complete; all four before/after remediation pairs passed in PostgreSQL CI |
 | 8 — Runtime proof & public service hardening | Complete on stacked `feature/submission-hardening`; CI, cost, access, deployment, and demo guards verified |
+| 9 — Public deployment, controlled demo PR & submission readiness | Complete on stacked `feature/public-deployment`; exact demo policy, public demo PR, Railway deployment guide, submission runbook |
 
-See [DEVLOG.md](DEVLOG.md) for verified results and branch dependencies.
+See [docs/submission-runbook.md](docs/submission-runbook.md) for judge evaluation walkthrough and [DEVLOG.md](DEVLOG.md) for verified results and branch dependencies.

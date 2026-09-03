@@ -6,7 +6,15 @@ After the original dropped-column fixture produces SQLSTATE `42703` and `PROVEN_
 
 The UI states: “Failure reproduced before remediation. The same experiment passed after remediation.” This claim applies only to the controlled experiment.
 
-The synthetic `samples/risky-saas` repository supplies deterministic known-positive cases for the ChangeProof demo.
+## Public Demo Repository and Revision
+
+The official demonstration uses the public synthetic repository:
+- **Repository**: [`choi11000/changeproof-demo`](https://github.com/choi11000/changeproof-demo)
+- **Pull Request**: [PR #1: Demo: remove legacy order status](https://github.com/choi11000/changeproof-demo/pull/1)
+- **Audited Head SHA**: `08302ccf5e67d12eee0d6470ac1136f4f644cba5`
+- **Execution Policy**: Enforced by server-side `ControlledDemoPolicy` (exact repository, PR number, and head SHA match required for sandbox execution authorization).
+
+The local synthetic `samples/risky-saas` fixture mirrors this schema and seed data.
 
 ## Baseline
 

@@ -158,6 +158,7 @@ class PullRequestAnalysis(BaseModel):
     experiment_plans: list[ExperimentPlan] = Field(default_factory=list)
     execution_allowed: bool = False
     controlled_fixture_id: str | None = None
+    execution_notice: str | None = None
     ai_usage: AIUsageMetadata | None = None
     warnings: list[AnalysisWarning] = Field(default_factory=list)
     completed_steps: list[AnalysisStep] = Field(default_factory=list)

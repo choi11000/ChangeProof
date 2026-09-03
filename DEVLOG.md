@@ -356,6 +356,32 @@ Branch: `feature/submission-hardening` (stacked on `feature/remediation-proof-lo
 
 Pull request: #5
 
+## 2026-09-03 — Phase 9 Public Deployment, Controlled Demo PR & Submission Readiness
+
+### Added
+
+- `ControlledDemoPolicy` in `apps/api/app/services/controlled_demo_policy.py`: Server-side exact demo identity authorization enforcing `repository.full_name`, `pull_request.number`, and audited `head_sha` matching.
+- Elimination of insecure substring matching (`"risky-saas" in repository.full_name.lower()`) preventing attacker-controlled execution.
+- Safe degraded notice when unaudited revisions are analyzed: *"Sandbox execution is disabled because this demo revision is not the audited revision."*
+- Audited server configuration: `CONTROLLED_DEMO_REPOSITORY`, `CONTROLLED_DEMO_PR`, `CONTROLLED_DEMO_HEAD_SHA`, and dynamic `PORT`.
+- Public synthetic demo repository: [`choi11000/changeproof-demo`](https://github.com/choi11000/changeproof-demo) with open pull request [PR #1](https://github.com/choi11000/changeproof-demo/pull/1) at audited revision `08302ccf5e67d12eee0d6470ac1136f4f644cba5`.
+- Dynamic PORT support in `apps/api/Dockerfile` for Railway compatibility.
+- Comprehensive Railway deployment guide (`docs/deployment-railway.md`) detailing the 3-service configuration (Web, API, Disposable Sandbox PostgreSQL; omitting unused product DB).
+- Comprehensive submission runbook (`docs/submission-runbook.md`) documenting judge walkthrough, local verification options, security guarantees, and execution proofs.
+- Frontend "Load demo PR" UX improvements with demo hint and server-provided execution notices.
+
+### Verification
+
+- Backend unit tests: **176 passed**, 11 skipped (sandbox integration requiring live db), **95.10% coverage** (exceeds 90% requirement).
+- Ruff check: **All checks passed!** (0 errors).
+- Python compileall: **Clean**.
+- Frontend: ESLint clean, TypeScript `tsc --noEmit` clean, Vitest **6/6 passed**, Next.js Turbopack optimized production build clean.
+- Railway deployment status: `DEPLOYMENT AUTH BLOCKED` recorded truthfully pending user Railway credentials.
+
+### Git
+
+Branch: `feature/public-deployment` (stacked on `feature/submission-hardening`)
+
 
 
 

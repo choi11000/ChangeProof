@@ -36,6 +36,10 @@ services:
       PROOF_RATE_LIMIT: ${PROOF_RATE_LIMIT:-3}
       TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-false}
       MAX_CONCURRENT_SANDBOX_RUNS: ${MAX_CONCURRENT_SANDBOX_RUNS:-2}
+      CONTROLLED_DEMO_REPOSITORY: ${CONTROLLED_DEMO_REPOSITORY:-choi11000/changeproof-demo}
+      CONTROLLED_DEMO_PR: ${CONTROLLED_DEMO_PR:-1}
+      CONTROLLED_DEMO_HEAD_SHA: ${CONTROLLED_DEMO_HEAD_SHA:-08302ccf5e67d12eee0d6470ac1136f4f644cba5}
+      PORT: ${PORT:-8000}
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,8 +56,8 @@ services:
       context: ./apps/web
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-        NEXT_PUBLIC_DEMO_REPOSITORY: ${NEXT_PUBLIC_DEMO_REPOSITORY:-}
-        NEXT_PUBLIC_DEMO_PR: ${NEXT_PUBLIC_DEMO_PR:-}
+        NEXT_PUBLIC_DEMO_REPOSITORY: ${NEXT_PUBLIC_DEMO_REPOSITORY:-choi11000/changeproof-demo}
+        NEXT_PUBLIC_DEMO_PR: ${NEXT_PUBLIC_DEMO_PR:-1}
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     depends_on:

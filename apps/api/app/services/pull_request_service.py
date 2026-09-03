@@ -11,6 +11,7 @@ from app.analyzers.dependency import (
 from app.analyzers.file_classifier import classify_file
 from app.analyzers.sql_migration import SqlMigrationParseError, SqlMigrationParser
 from app.clients.github import GitHubClient, GitHubError, GitHubFileContentUnavailable
+from app.core.config import get_settings
 from app.core.redaction import redact_sql_change
 from app.schemas.github import (
     AnalysisStep,
@@ -26,7 +27,7 @@ from app.schemas.github import (
     SqlAnalysisResult,
     SqlFileAnalysis,
 )
-from app.schemas.sql_change import SqlOperation
+from app.services.controlled_demo_policy import ControlledDemoPolicy
 from app.services.failure_planning_service import FailurePlanningService
 from app.services.repository_source_service import RepositorySourceService
 
@@ -73,12 +74,14 @@ class PullRequestService:
         source_service: RepositorySourceService | None = None,
         dependency_analyzer: DependencyAnalyzer | None = None,
         planning_service: FailurePlanningService | None = None,
+        demo_policy: ControlledDemoPolicy | None = None,
     ) -> None:
         self._github = github_client
         self._sql_parser = sql_parser
         self._source_service = source_service or RepositorySourceService(github_client)
         self._dependency_analyzer = dependency_analyzer or DependencyAnalyzer()
         self._planning_service = planning_service or FailurePlanningService()
+        self._demo_policy = demo_policy or ControlledDemoPolicy(get_settings())
 
     async def analyze(self, repository_input: str, pull_request: int) -> PullRequestAnalysis:
         completed_steps: list[AnalysisStep] = []
@@ -224,32 +227,8 @@ class PullRequestService:
                 plan_count=len(plans),
             )
 
-        # Check if repository matches a controlled synthetic demo fixture
-        execution_allowed = False
-        controlled_fixture_id: str | None = None
-        if "risky-saas" in repository.full_name.lower():
-            for cf in change_facts:
-                ch = cf.change
-                if ch.table == "orders" and ch.column == "legacy_status":
-                    controlled_fixture_id = "risky-saas/drop-legacy-status"
-                    execution_allowed = True
-                    break
-                if ch.table == "payments" and ch.operation == SqlOperation.DROP_TABLE:
-                    controlled_fixture_id = "risky-saas/drop-payments"
-                    execution_allowed = True
-                    break
-                if ch.table == "users" and ch.column == "phone":
-                    controlled_fixture_id = "risky-saas/set-not-null"
-                    execution_allowed = True
-                    break
-                if ch.table == "users" and ch.column == "email":
-                    controlled_fixture_id = "risky-saas/shrink-email"
-                    execution_allowed = True
-                    break
-                if ch.table == "orders" and ch.column == "external_reference":
-                    controlled_fixture_id = "risky-saas/safe-additive"
-                    execution_allowed = True
-                    break
+        # Evaluate exact server-controlled demo execution policy (no substring matching)
+        demo_decision = self._demo_policy.evaluate(repository, metadata, change_facts)
 
         return PullRequestAnalysis(
             repository=repository,
@@ -262,8 +241,9 @@ class PullRequestService:
             impact_summary=impact_summary,
             failure_hypotheses=hypotheses,
             experiment_plans=plans,
-            execution_allowed=execution_allowed,
-            controlled_fixture_id=controlled_fixture_id,
+            execution_allowed=demo_decision.allowed,
+            controlled_fixture_id=demo_decision.fixture_id,
+            execution_notice=demo_decision.notice,
             ai_usage=self._planning_service.last_usage,
             warnings=warnings,
             completed_steps=completed_steps,

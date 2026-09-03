@@ -175,6 +175,7 @@ type AnalysisResult = {
   experiment_plans?: ExperimentPlan[];
   execution_allowed?: boolean;
   controlled_fixture_id?: string | null;
+  execution_notice?: string | null;
   warnings: AnalysisWarning[];
 };
 
@@ -332,17 +333,20 @@ export function AnalysisForm() {
           {loading ? "Analyzing…" : "Analyze change"} <span>→</span>
         </button>
         {demoConfigured && (
-          <button
-            className="btn-load-demo"
-            disabled={loading}
-            onClick={() => {
-              setRepository(demoRepository);
-              setPullRequest(demoPullRequest);
-            }}
-            type="button"
-          >
-            Load demo PR
-          </button>
+          <div className="demo-load-group">
+            <button
+              className="btn-load-demo"
+              disabled={loading}
+              onClick={() => {
+                setRepository(demoRepository);
+                setPullRequest(demoPullRequest);
+              }}
+              type="button"
+            >
+              Load demo PR
+            </button>
+            <span className="demo-hint">Try prepared risky SaaS migration</span>
+          </div>
         )}
       </form>
 
@@ -555,7 +559,8 @@ export function AnalysisForm() {
                                 </button>
                               ) : (
                                 <p className="sandbox-limited-notice">
-                                  Sandbox execution is limited to controlled demo fixtures in this MVP.
+                                  {result.execution_notice ||
+                                    "Sandbox execution is limited to controlled demo fixtures in this MVP."}
                                 </p>
                               )}
                             </div>

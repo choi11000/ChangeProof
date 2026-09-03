@@ -29,6 +29,7 @@ The product promise is not merely to predict failure:
 - `clients/github.py`: timeout-bounded GitHub REST access for PRs, files, and repository trees.
 - `clients/openai_client.py`: timeout-bounded OpenAI client using Responses API with Structured Outputs.
 - `services/pull_request_service.py`: change-intake, dependency discovery, and planning orchestration.
+- `services/controlled_demo_policy.py`: exact server-side demo identity authorization (exact repository, PR number, and audited head SHA; no substring matching).
 - `services/repository_source_service.py`: bounded source snapshot collection at PR head SHA.
 - `services/failure_planning_service.py`: safe failure planning orchestration and domain validation.
 - `services/planning_context_budget.py`: deterministic change/evidence/warning selection with transparent truncation statistics.
@@ -41,9 +42,9 @@ The product promise is not merely to predict failure:
 - `schemas/experiment_identity.py`: canonical, server-owned SHA-256 identities separating the stable experiment contract from the executed migration subject.
 - `executors/postgres_experiment.py`: ephemeral schema isolation (`cp_run_<hex12>`), statement/lock timeouts, and secret-redacted execution runner.
 - `fixtures/experiment_registry.py`: server-controlled registry of synthetic demo fixtures.
-- `postgres`: persistent product data such as analyses, steps, and evidence.
+- `choi11000/changeproof-demo`: public synthetic demonstration repository with audited demo PR #1.
+- `samples/risky-saas`: local synthetic demonstration repository mirroring the demo schema.
 - `sandbox-postgres`: disposable target for isolated experiment execution.
-- `samples/risky-saas`: synthetic demonstration repository with known-positive risks.
 
 Execution requests cannot provide proof digests. The server hashes sorted, compact UTF-8 JSON over baseline schema, seed data, target, template, verification SQL, and verifier contract version for `experiment_contract_digest`; migration content and candidate variant form `subject_digest`. Verdict attribution requires exact SQLSTATE equality, while database cleanup status is recorded separately from the hypothesis verdict.
 
