@@ -148,6 +148,8 @@ class PullRequestAnalysis(BaseModel):
     impact_summary: ImpactSummary | None = None
     failure_hypotheses: list[FailureHypothesis] = Field(default_factory=list)
     experiment_plans: list[ExperimentPlan] = Field(default_factory=list)
+    execution_allowed: bool = False
+    controlled_fixture_id: str | None = None
     warnings: list[AnalysisWarning] = Field(default_factory=list)
     completed_steps: list[AnalysisStep] = Field(default_factory=list)
 

@@ -12,12 +12,14 @@ from app.analyzers.experiment_compiler import (
     ExperimentCompiler,
     ExperimentCompilerError,
 )
+from app.analyzers.experiment_verifier import ExperimentVerifier
 from app.analyzers.sql_migration import SqlMigrationParseError, SqlMigrationParser
 
 __all__ = [
     "DependencyAnalyzer",
     "ExperimentCompiler",
     "ExperimentCompilerError",
+    "ExperimentVerifier",
     "SqlMigrationParseError",
     "SqlMigrationParser",
     "build_change_facts",

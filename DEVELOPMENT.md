@@ -53,10 +53,25 @@ docker compose config
 docker compose up --build
 ```
 
-The disposable PostgreSQL service is opt-in for future validators:
+The disposable PostgreSQL sandbox service runs on port `5433`:
 
 ```bash
-docker compose --profile sandbox up sandbox-postgres
+docker compose --profile sandbox up -d sandbox-postgres
+```
+
+Run real PostgreSQL sandbox integration tests:
+
+```bash
+cd apps/api
+pytest -m sandbox
+```
+
+Execute an isolated experiment via API:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/experiments/execute \
+  -H "Content-Type: application/json" \
+  -d '{"fixture_id":"risky-saas/drop-legacy-status"}'
 ```
 
 ## Git workflow

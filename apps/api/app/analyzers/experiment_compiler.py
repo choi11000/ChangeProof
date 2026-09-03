@@ -8,6 +8,7 @@ from app.schemas.experiment import (
     ExperimentStep,
     ExperimentStepType,
     ExperimentTemplate,
+    compute_plan_digest,
 )
 from app.schemas.hypothesis import FailureHypothesis
 
@@ -257,7 +258,7 @@ class ExperimentCompiler:
         digest = hashlib.sha256(raw_id.encode("utf-8")).hexdigest()[:12]
         plan_id = f"plan_{digest}"
 
-        return ExperimentPlan(
+        plan = ExperimentPlan(
             id=plan_id,
             hypothesis_id=hypothesis.id,
             template=template,
@@ -267,3 +268,5 @@ class ExperimentCompiler:
             expected_observation=expected_observation,
             status=ExperimentStatus.NOT_EXECUTED,
         )
+        plan.plan_digest = compute_plan_digest(plan)
+        return plan

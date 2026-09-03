@@ -125,7 +125,7 @@ describe("Home", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders failure hypothesis and proposed experiment plan with unverified status", async () => {
+  it("renders failure hypothesis with notice when execution is limited", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -133,11 +133,9 @@ describe("Home", () => {
             number: 42,
             title: "Drop legacy status",
             changed_files: 1,
-            html_url: "https://github.com/acme/risky-saas/pull/42",
+            html_url: "https://github.com/generic/repo/pull/42",
           },
-          changed_files: [
-            { category: "SQL_MIGRATION", reason: "migration", file: { path: "migrations/001.sql" } },
-          ],
+          changed_files: [],
           sql_files: [],
           dependency_targets: [],
           dependency_evidence: [],
@@ -171,6 +169,78 @@ describe("Home", () => {
                   description: "Provision isolated PostgreSQL database instance",
                   sql: null,
                 },
+              ],
+              expected_observation: "Query execution fails",
+              status: "NOT_EXECUTED",
+            },
+          ],
+          execution_allowed: false,
+          warnings: [],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    render(<Home />);
+
+    fireEvent.change(screen.getByLabelText(/github repository/i), {
+      target: { value: "generic/repo" },
+    });
+    fireEvent.change(screen.getByLabelText(/pull request/i), { target: { value: "42" } });
+    fireEvent.click(screen.getByRole("button", { name: /analyze change/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Evidence-Grounded AI Reasoning")).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/sandbox execution is limited/i)).toBeInTheDocument();
+  });
+
+  it("runs experiment on controlled fixture and renders PROVEN_FAIL observation", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    // 1. First fetch for PR analysis
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          pull_request: {
+            number: 42,
+            title: "Drop legacy status",
+            changed_files: 1,
+            html_url: "https://github.com/acme/risky-saas/pull/42",
+          },
+          changed_files: [],
+          sql_files: [],
+          dependency_targets: [],
+          dependency_evidence: [],
+          impact_summary: null,
+          failure_hypotheses: [
+            {
+              id: "hyp_001",
+              category: "SCHEMA_CONTRACT_BREAK",
+              title: "Dropped column remains referenced",
+              statement: "Application references orders.legacy_status after migration",
+              change_ids: ["c1"],
+              evidence_ids: ["e1"],
+              rationale: "order_service.py:11 references dropped column",
+              expected_failure_mode: "UndefinedColumn",
+              assumptions: [],
+              experiment_template: "DROPPED_COLUMN_REFERENCE",
+              status: "UNVERIFIED",
+            },
+          ],
+          experiment_plans: [
+            {
+              id: "plan_001",
+              hypothesis_id: "hyp_001",
+              template: "DROPPED_COLUMN_REFERENCE",
+              change_ids: ["c1"],
+              evidence_ids: ["e1"],
+              steps: [
+                {
+                  order: 1,
+                  type: "PREPARE_DATABASE",
+                  description: "Provision isolated PostgreSQL database instance",
+                  sql: null,
+                },
                 {
                   order: 5,
                   type: "RUN_READ_QUERY",
@@ -180,13 +250,52 @@ describe("Home", () => {
               ],
               expected_observation: "Query execution is expected to fail with undefined column",
               status: "NOT_EXECUTED",
+              plan_digest: "a1b2c3d4e5f67890",
             },
           ],
+          execution_allowed: true,
+          controlled_fixture_id: "risky-saas/drop-legacy-status",
           warnings: [],
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       ),
     );
+
+    // 2. Second fetch for experiment execution
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          run: {
+            id: "run_001",
+            experiment_plan_id: "plan_001",
+            plan_digest: "a1b2c3d4e5f67890",
+            template: "DROPPED_COLUMN_REFERENCE",
+            verdict: "PROVEN_FAIL",
+            started_at: "2026-09-03T00:00:00Z",
+            finished_at: "2026-09-03T00:00:01Z",
+            step_results: [
+              {
+                order: 1,
+                type: "PREPARE_DATABASE",
+                status: "PASSED",
+                duration_ms: 5,
+              },
+              {
+                order: 5,
+                type: "RUN_READ_QUERY",
+                status: "FAILED",
+                duration_ms: 8,
+                sql_state: "42703",
+                message: 'column "legacy_status" does not exist',
+              },
+            ],
+            summary: "Failure reproduced in isolated PostgreSQL: Column is removed by migration and referenced query failed with SQLSTATE 42703 (undefined_column).",
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
     render(<Home />);
 
     fireEvent.change(screen.getByLabelText(/github repository/i), {
@@ -195,13 +304,23 @@ describe("Home", () => {
     fireEvent.change(screen.getByLabelText(/pull request/i), { target: { value: "42" } });
     fireEvent.click(screen.getByRole("button", { name: /analyze change/i }));
 
+    // Run experiment button appears
     await waitFor(() =>
-      expect(screen.getByText("Evidence-Grounded AI Reasoning")).toBeInTheDocument(),
+      expect(
+        screen.getByRole("button", { name: /run experiment in isolated postgresql/i }),
+      ).toBeInTheDocument(),
     );
-    expect(screen.getByText("HYPOTHESIS • UNVERIFIED")).toBeInTheDocument();
-    expect(screen.getByText("Dropped column remains referenced")).toBeInTheDocument();
-    expect(screen.getByText("PROPOSED EXPERIMENT • NOT_EXECUTED")).toBeInTheDocument();
-    expect(screen.getByText('SELECT "legacy_status" FROM "orders" LIMIT 1;')).toBeInTheDocument();
-    expect(screen.getAllByText(/not executed yet/i).length).toBeGreaterThan(0);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /run experiment in isolated postgresql/i }),
+    );
+
+    // Observed result rendered
+    await waitFor(() =>
+      expect(screen.getByText("Failure reproduced in isolated PostgreSQL.")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("REPRODUCED • PROVEN FAIL")).toBeInTheDocument();
+    expect(screen.getByText(/SQLSTATE: 42703/)).toBeInTheDocument();
+    expect(screen.getByText(/a1b2c3d4e5f67890/)).toBeInTheDocument();
   });
 });

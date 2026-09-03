@@ -10,29 +10,34 @@ ChangeProof never converts an LLM opinion directly into a verdict. Facts come fr
 3. Dependency Discovery      Application <-> schema                COMPLETE
 4. Failure Hypothesis        Evidence-grounded AI reasoning        COMPLETE
 5. Experiment Planning       Deterministic ExperimentCompiler      COMPLETE
-6. Execution                 Ephemeral PostgreSQL                   NEXT
-7. Evidence                  Observed results
-8. Remediation
+6. Execution                 Ephemeral PostgreSQL                  COMPLETE
+7. Evidence                  Observed SQLSTATE results             COMPLETE
+8. Remediation               Deterministic schema fix              NEXT
 9. Re-execution              Same experiment
 10. Proof
 ```
 
-The product promise is not merely to predict failure. ChangeProof is designed to reproduce a concrete failure before production, remediate it, and rerun the same experiment to prove the result.
+The product promise is not merely to predict failure:
+> Don't predict the failure. Reproduce it before production.
 
 ## Runtime components
 
-- `apps/web`: Next.js App Router interface for PR input, change facts, dependency evidence, failure hypotheses, and experiment plans.
-- `apps/api`: FastAPI HTTP boundary and explicit change analysis pipeline.
+- `apps/web`: Next.js App Router interface for PR input, change facts, dependency evidence, failure hypotheses, experiment plans, and observed PostgreSQL execution results.
+- `apps/api`: FastAPI HTTP boundary, PR analysis pipeline, and experiment execution router.
 - `clients/github.py`: timeout-bounded GitHub REST access for PRs, files, and repository trees.
-- `clients/openai_client.py`: timeout-bounded OpenAI client using Structured Outputs.
+- `clients/openai_client.py`: timeout-bounded OpenAI client using Responses API with Structured Outputs.
 - `services/pull_request_service.py`: change-intake, dependency discovery, and planning orchestration.
 - `services/repository_source_service.py`: bounded source snapshot collection at PR head SHA.
 - `services/failure_planning_service.py`: safe failure planning orchestration and domain validation.
+- `services/experiment_execution_service.py`: controlled fixture validation, executor invocation, and deterministic verdict synthesis.
 - `analyzers/file_classifier.py`: deterministic path-based classification and content policy.
 - `analyzers/dependency.py`: deterministic target extraction, reference matching, and impact summary.
 - `analyzers/experiment_compiler.py`: deterministic compiler generating executable, read-oriented experiment plans.
+- `analyzers/experiment_verifier.py`: deterministic verifier attributing PostgreSQL observations to `PROVEN_FAIL` / `PROVEN_PASS` / `INCONCLUSIVE` / `EXECUTION_ERROR`.
+- `executors/postgres_experiment.py`: ephemeral schema isolation (`cp_run_<hex12>`), statement/lock timeouts, and secret-redacted execution runner.
+- `fixtures/experiment_registry.py`: server-controlled registry of synthetic demo fixtures.
 - `postgres`: persistent product data such as analyses, steps, and evidence.
-- `sandbox-postgres`: opt-in disposable target for migration validation.
+- `sandbox-postgres`: disposable target for isolated experiment execution.
 - `samples/risky-saas`: synthetic demonstration repository with known-positive risks.
 
 ## SQL change analysis

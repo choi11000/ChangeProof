@@ -28,6 +28,9 @@ dev = [
 [tool.pytest.ini_options]
 addopts = "-q --cov=app --cov-report=term-missing --cov-fail-under=90"
 testpaths = ["tests"]
+markers = [
+  "sandbox: marks tests requiring a running sandbox PostgreSQL instance",
+]
 
 [tool.ruff]
 line-length = 100

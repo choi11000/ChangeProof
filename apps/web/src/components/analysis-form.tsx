@@ -96,6 +96,44 @@ type ExperimentPlan = {
   steps: ExperimentStep[];
   expected_observation: string;
   status: "NOT_EXECUTED" | "PLANNED";
+  plan_digest?: string | null;
+};
+
+type ExperimentVerdict =
+  | "PROVEN_FAIL"
+  | "PROVEN_PASS"
+  | "INCONCLUSIVE"
+  | "EXECUTION_ERROR";
+
+type ExperimentStepStatus =
+  | "PENDING"
+  | "RUNNING"
+  | "PASSED"
+  | "FAILED"
+  | "SKIPPED";
+
+type ExperimentStepResult = {
+  order: number;
+  type: string;
+  status: ExperimentStepStatus;
+  duration_ms: number;
+  sql_state?: string | null;
+  error_type?: string | null;
+  message?: string | null;
+  scalar_value?: string | number | boolean | null;
+  row_count?: number | null;
+};
+
+type ExperimentRun = {
+  id: string;
+  experiment_plan_id: string;
+  plan_digest: string;
+  template: ExperimentTemplate;
+  verdict: ExperimentVerdict;
+  started_at: string;
+  finished_at: string;
+  step_results: ExperimentStepResult[];
+  summary: string;
 };
 
 type AnalysisResult = {
@@ -117,6 +155,8 @@ type AnalysisResult = {
   impact_summary: ImpactSummary | null;
   failure_hypotheses?: FailureHypothesis[];
   experiment_plans?: ExperimentPlan[];
+  execution_allowed?: boolean;
+  controlled_fixture_id?: string | null;
   warnings: AnalysisWarning[];
 };
 
@@ -144,6 +184,11 @@ export function AnalysisForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Phase 6 execution state
+  const [executingPlanId, setExecutingPlanId] = useState<string | null>(null);
+  const [experimentRuns, setExperimentRuns] = useState<Record<string, ExperimentRun>>({});
+  const [executionError, setExecutionError] = useState<string | null>(null);
+
   const counts = useMemo(() => {
     const files = result?.changed_files ?? [];
     return {
@@ -162,6 +207,8 @@ export function AnalysisForm() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setExperimentRuns({});
+    setExecutionError(null);
     try {
       const response = await fetch(`${apiUrl}/api/v1/analyses/github-pr`, {
         method: "POST",
@@ -180,6 +227,31 @@ export function AnalysisForm() {
       setError(requestError instanceof Error ? requestError.message : "Analysis failed");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function runExperiment(fixtureId: string, planId: string, planDigest?: string | null) {
+    setExecutingPlanId(planId);
+    setExecutionError(null);
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/experiments/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fixture_id: fixtureId,
+          experiment_plan_id: planId,
+          plan_digest: planDigest ?? undefined,
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body.detail ?? "Experiment sandbox execution failed");
+      }
+      setExperimentRuns((prev) => ({ ...prev, [planId]: body.run }));
+    } catch (err) {
+      setExecutionError(err instanceof Error ? err.message : "Experiment execution failed");
+    } finally {
+      setExecutingPlanId(null);
     }
   }
 
@@ -215,6 +287,7 @@ export function AnalysisForm() {
       </form>
 
       {error && <p className="analysis-error" role="alert">{error}</p>}
+      {executionError && <p className="analysis-error" role="alert">{executionError}</p>}
 
       {result && (
         <section className="analysis-result" aria-label="Pull request analysis">
@@ -345,7 +418,7 @@ export function AnalysisForm() {
                 <p className="eyebrow">FAILURE HYPOTHESES &amp; EXPERIMENT PLANNING</p>
                 <h3>Evidence-Grounded AI Reasoning</h3>
               </div>
-              <span className="badge badge-unverified">NOT EXECUTED YET</span>
+              <span className="badge badge-unverified">UNVERIFIED PROPOSAL</span>
             </div>
 
             {result.failure_hypotheses && result.failure_hypotheses.length > 0 ? (
@@ -354,6 +427,7 @@ export function AnalysisForm() {
                   const matchingPlan = result.experiment_plans?.find(
                     (p) => p.hypothesis_id === hypothesis.id,
                   );
+                  const executionRun = matchingPlan ? experimentRuns[matchingPlan.id] : null;
 
                   return (
                     <article key={hypothesis.id} className="hypothesis-card">
@@ -381,7 +455,9 @@ export function AnalysisForm() {
                               </span>
                               <h5>Template: {matchingPlan.template}</h5>
                             </div>
-                            <span className="plan-status-notice">Not executed yet</span>
+                            <span className="plan-status-notice">
+                              {executionRun ? "Executed in sandbox" : "Not executed yet"}
+                            </span>
                           </div>
                           <p className="plan-observation">
                             <strong>Expected observation:</strong> {matchingPlan.expected_observation}
@@ -394,6 +470,111 @@ export function AnalysisForm() {
                               </li>
                             ))}
                           </ol>
+
+                          {/* Phase 6: Run experiment action or generic limit notice */}
+                          {!executionRun && (
+                            <div>
+                              {result.execution_allowed && result.controlled_fixture_id ? (
+                                <button
+                                  type="button"
+                                  className="btn-run-experiment"
+                                  disabled={executingPlanId === matchingPlan.id}
+                                  onClick={() =>
+                                    runExperiment(
+                                      result.controlled_fixture_id!,
+                                      matchingPlan.id,
+                                      matchingPlan.plan_digest,
+                                    )
+                                  }
+                                >
+                                  {executingPlanId === matchingPlan.id
+                                    ? "Reproducing failure in PostgreSQL..."
+                                    : "Run experiment in isolated PostgreSQL →"}
+                                </button>
+                              ) : (
+                                <p className="sandbox-limited-notice">
+                                  Sandbox execution is limited to controlled demo fixtures in this MVP.
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Phase 6: Observed PostgreSQL Result */}
+                          {executionRun && (
+                            <div className="execution-run-card" aria-label="Observed Result">
+                              <div className="run-header">
+                                <div>
+                                  <span
+                                    className={`badge ${
+                                      executionRun.verdict === "PROVEN_FAIL"
+                                        ? "badge-fail"
+                                        : executionRun.verdict === "PROVEN_PASS"
+                                          ? "badge-pass"
+                                          : executionRun.verdict === "EXECUTION_ERROR"
+                                            ? "badge-error"
+                                            : "badge-inconclusive"
+                                    }`}
+                                  >
+                                    {executionRun.verdict === "PROVEN_FAIL"
+                                      ? "REPRODUCED • PROVEN FAIL"
+                                      : executionRun.verdict === "PROVEN_PASS"
+                                        ? "NOT REPRODUCED • PROVEN PASS"
+                                        : executionRun.verdict}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div
+                                className={`run-headline ${
+                                  executionRun.verdict === "PROVEN_FAIL"
+                                    ? "proven-fail"
+                                    : executionRun.verdict === "PROVEN_PASS"
+                                      ? "proven-pass"
+                                      : ""
+                                }`}
+                              >
+                                {executionRun.verdict === "PROVEN_FAIL"
+                                  ? "Failure reproduced in isolated PostgreSQL."
+                                  : executionRun.verdict === "PROVEN_PASS"
+                                    ? "This experiment completed without the expected failure."
+                                    : "Experiment executed with non-conclusive observations."}
+                              </div>
+
+                              <p className="run-summary">
+                                {executionRun.summary}
+                                {executionRun.verdict === "PROVEN_PASS" && (
+                                  <span className="run-subnote">
+                                    This verdict applies only to this experiment, not to the entire pull request.
+                                  </span>
+                                )}
+                              </p>
+
+                              <ul className="step-results-list">
+                                {executionRun.step_results.map((step) => (
+                                  <li
+                                    key={step.order}
+                                    className={`step-result-item status-${step.status.toLowerCase()}`}
+                                  >
+                                    <div>
+                                      <strong>Step {step.order}:</strong> {step.type}
+                                    </div>
+                                    <div>
+                                      <span>{step.status}</span> ({step.duration_ms}ms)
+                                    </div>
+                                    {step.status === "FAILED" && (
+                                      <div className="step-error-detail">
+                                        SQLSTATE: {step.sql_state ?? "N/A"} • {step.message}
+                                      </div>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+
+                              <div className="plan-digest-footer">
+                                Canonical Plan Digest: <code>{executionRun.plan_digest}</code>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </article>

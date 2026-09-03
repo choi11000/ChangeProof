@@ -58,6 +58,8 @@ services:
       POSTGRES_PASSWORD: changeproof
     tmpfs:
       - /var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
 
 volumes:
   changeproof-data:

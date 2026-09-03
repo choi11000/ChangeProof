@@ -211,6 +211,63 @@ Commits:
 ### Git
 
 Branch: `feature/failure-experiment-planning` (stacked on `feature/dependency-discovery`)
+Commit: `455d315 feat: implement failure hypothesis and experiment planning`
+PR: #2 (GitHub stacked PR `feature/failure-experiment-planning` -> `feature/dependency-discovery`)
+
+## 2026-09-03 — Phase 5.1 API Alignment & Phase 6 Ephemeral PostgreSQL Experiment Execution
+
+### Added
+
+- `OpenAIHypothesisClient` aligned with official OpenAI Responses API (`client.responses.parse`) using `instructions` and `output_parsed`
+- Forwarding of `OPENAI_API_KEY`, `OPENAI_MODEL`, and `GITHUB_TOKEN` into API container in `compose.yaml`
+- Safe additive migration fixture `samples/risky-saas/migrations/005_safe_add_external_reference.sql`
+- Port mapping `127.0.0.1:5433:5432` for `sandbox-postgres` service in `compose.yaml`
+- Phase 6 Execution schemas (`ExperimentVerdict`, `ExperimentStepStatus`, `ExperimentStepResult`, `ExperimentRun`, `ExecuteExperimentRequest`, `ExecuteExperimentResponse`) in `app/schemas/execution.py`
+- Server-controlled fixture registry (`app/fixtures/experiment_registry.py`) with strict demo allowlist (`risky-saas/drop-legacy-status`, `risky-saas/drop-payments`, `risky-saas/set-not-null`, `risky-saas/shrink-email`, `risky-saas/safe-additive`)
+- Ephemeral PostgreSQL executor (`PostgresExperimentExecutor`) using `psycopg` protocol with unique isolated schema per run (`cp_run_<hex12>`), statement (`10s`) and lock (`5s`) timeouts, and guaranteed `DROP SCHEMA CASCADE` in `finally`
+- Deterministic verifier (`ExperimentVerifier`) mapping PostgreSQL execution results and SQLSTATE codes (`42703`, `23502`, `22001`, `42P01`) to `PROVEN_FAIL`, and safe clean migrations to `PROVEN_PASS`
+- Plan digest computation (`compute_plan_digest`) for tamper-evident audit lineage
+- Credential and secret redaction (`redact_secrets`) preventing leak of database passwords or connection URLs in step messages
+- Execution service (`ExperimentExecutionService`) and endpoint `POST /api/v1/experiments/execute`
+- Frontend "Run experiment in isolated PostgreSQL →" button for controlled fixtures
+- Safe boundary notice: "Sandbox execution is limited to controlled demo fixtures in this MVP" for generic PRs
+- Frontend `OBSERVED RESULT` card displaying `PROVEN_FAIL` / `PROVEN_PASS` badges, SQLSTATE codes, step results checklist, execution durations, and plan digest
+- Unit and integration tests for executor, verifier, registry, service, and web UI
+
+### Decisions
+
+- AI is completely excluded from determining experiment verdicts or SQLSTATE errors. Proof is strictly derived from PostgreSQL engine responses.
+- Docker socket is never mounted into containers; no child processes or shell commands (`docker`, `psql`, `bash`) are executed.
+- Generic PRs are restricted from arbitrary sandbox execution (`execution_allowed: false`) to eliminate arbitrary SQL injection risk.
+- Ephemeral per-run schemas (`cp_run_<hex12>`) provide isolation within the sandbox database without requiring per-run container spin-up latency.
+- Real sandbox integration tests use `@pytest.mark.sandbox` and skip cleanly when sandbox PostgreSQL is not reachable on `localhost:5433`.
+
+### Tests
+
+- API: `pytest` PASS (130 passed, 5 skipped for sandbox, 94.16% coverage > 90% required)
+- API: `ruff check .` PASS
+- API: Python bytecode compilation PASS
+- Web: ESLint PASS (0 warnings)
+- Web: TypeScript typecheck PASS
+- Web: Vitest PASS (5 tests passed)
+- Web: Next.js production build PASS
+- Web: npm audit PASS (0 vulnerabilities)
+
+### Acceptance & Docker Status
+
+- **Host Docker Status**: Docker is NOT installed or running on this Windows host machine (`CommandNotFoundException`).
+- **Phase 6 Verification Status**:
+  - Implementation: **COMPLETE**
+  - Unit, mock-executor, and web component tests: **100% PASS**
+  - Live Docker sandbox runtime execution on this host: **BLOCKED** due to Docker unavailable on host (per Rule 59).
+
+### Git
+
+Branch: `feature/postgres-experiment-execution` (stacked on `feature/failure-experiment-planning`)
+Commits:
+- `c8cf57d fix: forward AI credentials into API container`
+- `7c7623a refactor: align OpenAI hypothesis client with Responses API`
+
 
 
 

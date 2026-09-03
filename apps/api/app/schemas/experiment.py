@@ -41,3 +41,19 @@ class ExperimentPlan(BaseModel):
     steps: list[ExperimentStep] = Field(default_factory=list)
     expected_observation: str
     status: ExperimentStatus = ExperimentStatus.NOT_EXECUTED
+    plan_digest: str | None = None
+
+
+def compute_plan_digest(plan: ExperimentPlan) -> str:
+    import hashlib
+    import json
+
+    canonical = json.dumps(
+        {
+            "template": plan.template,
+            "steps": [{"order": s.order, "type": s.type, "sql": s.sql} for s in plan.steps],
+            "expected_observation": plan.expected_observation,
+        },
+        sort_keys=True,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]

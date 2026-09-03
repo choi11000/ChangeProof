@@ -26,6 +26,7 @@ from app.schemas.github import (
     SqlAnalysisResult,
     SqlFileAnalysis,
 )
+from app.schemas.sql_change import SqlOperation
 from app.services.failure_planning_service import FailurePlanningService
 from app.services.repository_source_service import RepositorySourceService
 
@@ -222,6 +223,33 @@ class PullRequestService:
                 plan_count=len(plans),
             )
 
+        # Check if repository matches a controlled synthetic demo fixture
+        execution_allowed = False
+        controlled_fixture_id: str | None = None
+        if "risky-saas" in repository.full_name.lower():
+            for cf in change_facts:
+                ch = cf.change
+                if ch.table == "orders" and ch.column == "legacy_status":
+                    controlled_fixture_id = "risky-saas/drop-legacy-status"
+                    execution_allowed = True
+                    break
+                if ch.table == "payments" and ch.operation == SqlOperation.DROP_TABLE:
+                    controlled_fixture_id = "risky-saas/drop-payments"
+                    execution_allowed = True
+                    break
+                if ch.table == "users" and ch.column == "phone":
+                    controlled_fixture_id = "risky-saas/set-not-null"
+                    execution_allowed = True
+                    break
+                if ch.table == "users" and ch.column == "email":
+                    controlled_fixture_id = "risky-saas/shrink-email"
+                    execution_allowed = True
+                    break
+                if ch.table == "orders" and ch.column == "external_reference":
+                    controlled_fixture_id = "risky-saas/safe-additive"
+                    execution_allowed = True
+                    break
+
         return PullRequestAnalysis(
             repository=repository,
             pull_request=metadata,
@@ -233,6 +261,8 @@ class PullRequestService:
             impact_summary=impact_summary,
             failure_hypotheses=hypotheses,
             experiment_plans=plans,
+            execution_allowed=execution_allowed,
+            controlled_fixture_id=controlled_fixture_id,
             warnings=warnings,
             completed_steps=completed_steps,
         )
