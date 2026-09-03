@@ -9,6 +9,7 @@ description = "Evidence-backed database change risk analysis API"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi==0.141.1",
+  "httpx==0.28.1",
   "pydantic-settings==2.10.1",
   "psycopg[binary]==3.2.9",
   "sqlalchemy==2.0.43",
@@ -18,7 +19,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "httpx==0.28.1",
   "pytest==8.4.1",
   "pytest-cov==6.2.1",
   "ruff==0.12.9",

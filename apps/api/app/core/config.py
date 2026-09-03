@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     sandbox_database_url: str = (
         "postgresql+psycopg://changeproof:changeproof@localhost:5433/changeproof_sandbox"
     )
+    github_token: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

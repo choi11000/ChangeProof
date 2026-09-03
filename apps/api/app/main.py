@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.analyses import router as analyses_router
+from app.api.errors import register_error_handlers
 from app.api.health import router as health_router
 from app.core.config import get_settings
 
@@ -19,6 +21,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(health_router, prefix=settings.api_prefix)
+app.include_router(analyses_router, prefix=settings.api_prefix)
+register_error_handlers(app)
 
 
 @app.get("/", include_in_schema=False)
