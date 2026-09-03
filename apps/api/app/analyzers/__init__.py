@@ -8,10 +8,16 @@ from app.analyzers.dependency import (
     extract_dependency_targets,
     summarize_impact,
 )
+from app.analyzers.experiment_compiler import (
+    ExperimentCompiler,
+    ExperimentCompilerError,
+)
 from app.analyzers.sql_migration import SqlMigrationParseError, SqlMigrationParser
 
 __all__ = [
     "DependencyAnalyzer",
+    "ExperimentCompiler",
+    "ExperimentCompilerError",
     "SqlMigrationParseError",
     "SqlMigrationParser",
     "build_change_facts",
