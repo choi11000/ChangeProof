@@ -26,6 +26,7 @@ from app.schemas.github import (
     SqlAnalysisResult,
     SqlFileAnalysis,
 )
+from app.services.failure_planning_service import FailurePlanningService
 from app.services.repository_source_service import RepositorySourceService
 
 logger = logging.getLogger(__name__)
@@ -70,11 +71,13 @@ class PullRequestService:
         sql_parser: SqlMigrationParser,
         source_service: RepositorySourceService | None = None,
         dependency_analyzer: DependencyAnalyzer | None = None,
+        planning_service: FailurePlanningService | None = None,
     ) -> None:
         self._github = github_client
         self._sql_parser = sql_parser
         self._source_service = source_service or RepositorySourceService(github_client)
         self._dependency_analyzer = dependency_analyzer or DependencyAnalyzer()
+        self._planning_service = planning_service or FailurePlanningService()
 
     async def analyze(self, repository_input: str, pull_request: int) -> PullRequestAnalysis:
         completed_steps: list[AnalysisStep] = []
@@ -201,6 +204,24 @@ class PullRequestService:
             scan_complete=impact_summary.scan_complete,
         )
 
+        # Phase 5: Generate failure hypotheses & compile executable experiment plans
+        hypotheses, plans, plan_warnings, plan_steps = await self._planning_service.plan(
+            change_facts,
+            evidences,
+            scan_complete=snapshot.scan_complete,
+            existing_warnings=warnings,
+        )
+        warnings.extend(plan_warnings)
+        for step in plan_steps:
+            completed_steps.append(step)
+            self._log_step(
+                step,
+                repository.full_name,
+                pull_request,
+                hypothesis_count=len(hypotheses),
+                plan_count=len(plans),
+            )
+
         return PullRequestAnalysis(
             repository=repository,
             pull_request=metadata,
@@ -210,6 +231,8 @@ class PullRequestService:
             dependency_targets=targets,
             dependency_evidence=evidences,
             impact_summary=impact_summary,
+            failure_hypotheses=hypotheses,
+            experiment_plans=plans,
             warnings=warnings,
             completed_steps=completed_steps,
         )

@@ -5,8 +5,10 @@ from fastapi import APIRouter, Depends, status
 
 from app.analyzers.sql_migration import SqlMigrationParser
 from app.clients.github import GitHubClient, build_github_http_client
+from app.clients.openai_client import HypothesisGenerator, OpenAIHypothesisClient
 from app.core.config import get_settings
 from app.schemas.github import AnalyzeGitHubPullRequest, PullRequestAnalysis
+from app.services.failure_planning_service import FailurePlanningService
 from app.services.pull_request_service import PullRequestService
 
 router = APIRouter(prefix="/analyses", tags=["analyses"])
@@ -21,10 +23,24 @@ async def get_github_client() -> AsyncIterator[GitHubClient]:
         await http_client.aclose()
 
 
+def get_hypothesis_generator() -> HypothesisGenerator:
+    settings = get_settings()
+    return OpenAIHypothesisClient(
+        api_key=settings.openai_api_key,
+        model=settings.openai_model,
+    )
+
+
 def get_pull_request_service(
     github_client: Annotated[GitHubClient, Depends(get_github_client)],
+    hypothesis_generator: Annotated[HypothesisGenerator, Depends(get_hypothesis_generator)],
 ) -> PullRequestService:
-    return PullRequestService(github_client, SqlMigrationParser())
+    planning_service = FailurePlanningService(generator=hypothesis_generator)
+    return PullRequestService(
+        github_client,
+        SqlMigrationParser(),
+        planning_service=planning_service,
+    )
 
 
 @router.post(
