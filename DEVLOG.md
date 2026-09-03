@@ -65,4 +65,4 @@ Commit: `c64e3b8 feat: bootstrap ChangeProof development environment`
 
 Branch: `feature/sql-change-parser`
 
-Commit: pending
+Commit: `f809e1e feat: implement SQL migration parser`
