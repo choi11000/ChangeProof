@@ -208,6 +208,120 @@ def test_dependency_discovery_finds_unchanged_application_references() -> None:
         AnalysisStep.DISCOVER_DEPENDENCIES,
         AnalysisStep.SUMMARIZE_IMPACT,
     ]
+    assert any(w.code is AnalysisWarningCode.AI_NOT_CONFIGURED for w in result.warnings)
+    assert result.failure_hypotheses == []
+    assert result.experiment_plans == []
+    assert result.completed_steps == expected_steps
+
+
+def test_pull_request_service_end_to_end_with_failure_planning() -> None:
+    from app.clients.openai_client import FailurePlanningContext
+    from app.schemas.experiment import ExperimentStatus, ExperimentTemplate
+    from app.schemas.hypothesis import (
+        FailureCategory,
+        FailureHypothesis,
+        HypothesisProposalResult,
+        HypothesisStatus,
+    )
+    from app.services.failure_planning_service import FailurePlanningService
+
+    class GeneratorMock:
+        is_configured = True
+
+        async def generate(self, context: FailurePlanningContext) -> HypothesisProposalResult:
+            cid = context.changes[0].id
+            eid = context.evidence[0].id
+            return HypothesisProposalResult(
+                hypotheses=[
+                    FailureHypothesis(
+                        id="hyp_001",
+                        category=FailureCategory.SCHEMA_CONTRACT_BREAK,
+                        title="Dropped column remains referenced",
+                        statement=(
+                            "orders.legacy_status is dropped but referenced in "
+                            "order_service.py"
+                        ),
+                        change_ids=[cid],
+                        evidence_ids=[eid],
+                        rationale="order_service.py references dropped column",
+                        expected_failure_mode="UndefinedColumn",
+                        assumptions=["orders table contains rows"],
+                        experiment_template=ExperimentTemplate.DROPPED_COLUMN_REFERENCE,
+                        status=HypothesisStatus.UNVERIFIED,
+                    )
+                ]
+            )
+
+    diff_content = "ALTER TABLE orders DROP COLUMN legacy_status;"
+    app_code = "return order.legacy_status"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path == "/repos/acme/risky-saas":
+            return httpx.Response(200, json={"full_name": "acme/risky-saas"})
+        if path == "/repos/acme/risky-saas/pulls/42":
+            return httpx.Response(200, json=_pull_request())
+        if path == "/repos/acme/risky-saas/pulls/42/files":
+            return httpx.Response(200, json=[_file("migrations/001.sql", patch=diff_content)])
+        if path.endswith("/contents/migrations/001.sql"):
+            return httpx.Response(200, json=_content(diff_content, "mig-sha"))
+        if "git/trees/head-sha" in path:
+            return httpx.Response(
+                200,
+                json={
+                    "sha": "head-sha",
+                    "tree": [
+                        {"path": "migrations/001.sql", "type": "blob", "sha": "mig-sha"},
+                        {"path": "app/order_service.py", "type": "blob", "sha": "app-sha"},
+                    ],
+                    "truncated": False,
+                },
+            )
+        if path.endswith("/contents/app/order_service.py"):
+            return httpx.Response(200, json=_content(app_code, "app-sha"))
+        raise AssertionError(f"Unexpected request: {request.url}")
+
+    async def scenario():
+        http_client = httpx.AsyncClient(
+            base_url="https://api.github.test", transport=httpx.MockTransport(handler)
+        )
+        async with http_client:
+            planning = FailurePlanningService(generator=GeneratorMock())
+            service = PullRequestService(
+                GitHubClient(http_client),
+                SqlMigrationParser(),
+                planning_service=planning,
+            )
+            return await service.analyze("https://github.com/acme/risky-saas", 42)
+
+    result = asyncio.run(scenario())
+
+    assert len(result.failure_hypotheses) == 1
+    hyp = result.failure_hypotheses[0]
+    assert hyp.id == "hyp_001"
+    assert hyp.status is HypothesisStatus.UNVERIFIED
+
+    assert len(result.experiment_plans) == 1
+    plan = result.experiment_plans[0]
+    assert plan.status is ExperimentStatus.NOT_EXECUTED
+    assert plan.template is ExperimentTemplate.DROPPED_COLUMN_REFERENCE
+
+    expected_steps = [
+        AnalysisStep.FETCH_PR_METADATA,
+        AnalysisStep.FETCH_CHANGED_FILES,
+        AnalysisStep.CLASSIFY_FILES,
+        AnalysisStep.FETCH_SQL_CONTENT,
+        AnalysisStep.ANALYZE_SQL,
+        AnalysisStep.BUILD_CHANGE_FACTS,
+        AnalysisStep.EXTRACT_DEPENDENCY_TARGETS,
+        AnalysisStep.FETCH_REPOSITORY_TREE,
+        AnalysisStep.FETCH_APPLICATION_CONTENT,
+        AnalysisStep.DISCOVER_DEPENDENCIES,
+        AnalysisStep.SUMMARIZE_IMPACT,
+        AnalysisStep.GENERATE_FAILURE_HYPOTHESES,
+        AnalysisStep.VALIDATE_HYPOTHESES,
+        AnalysisStep.COMPILE_EXPERIMENT_PLANS,
+    ]
     assert result.completed_steps == expected_steps
 
 

@@ -83,6 +83,7 @@ describe("Home", () => {
           ],
           dependency_evidence: [
             {
+              id: "ev_1",
               target: { type: "COLUMN", table: "orders", column: "legacy_status" },
               path: "app/order_service.py",
               line: 11,
@@ -122,5 +123,85 @@ describe("Home", () => {
     expect(
       screen.getByText("return {'id': order.id, 'status': order.legacy_status}"),
     ).toBeInTheDocument();
+  });
+
+  it("renders failure hypothesis and proposed experiment plan with unverified status", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          pull_request: {
+            number: 42,
+            title: "Drop legacy status",
+            changed_files: 1,
+            html_url: "https://github.com/acme/risky-saas/pull/42",
+          },
+          changed_files: [
+            { category: "SQL_MIGRATION", reason: "migration", file: { path: "migrations/001.sql" } },
+          ],
+          sql_files: [],
+          dependency_targets: [],
+          dependency_evidence: [],
+          impact_summary: null,
+          failure_hypotheses: [
+            {
+              id: "hyp_001",
+              category: "SCHEMA_CONTRACT_BREAK",
+              title: "Dropped column remains referenced",
+              statement: "Application references orders.legacy_status after migration",
+              change_ids: ["c1"],
+              evidence_ids: ["e1"],
+              rationale: "order_service.py:11 references dropped column",
+              expected_failure_mode: "UndefinedColumn",
+              assumptions: ["orders table exists"],
+              experiment_template: "DROPPED_COLUMN_REFERENCE",
+              status: "UNVERIFIED",
+            },
+          ],
+          experiment_plans: [
+            {
+              id: "plan_001",
+              hypothesis_id: "hyp_001",
+              template: "DROPPED_COLUMN_REFERENCE",
+              change_ids: ["c1"],
+              evidence_ids: ["e1"],
+              steps: [
+                {
+                  order: 1,
+                  type: "PREPARE_DATABASE",
+                  description: "Provision isolated PostgreSQL database instance",
+                  sql: null,
+                },
+                {
+                  order: 5,
+                  type: "RUN_READ_QUERY",
+                  description: 'Execute query against removed column "legacy_status"',
+                  sql: 'SELECT "legacy_status" FROM "orders" LIMIT 1;',
+                },
+              ],
+              expected_observation: "Query execution is expected to fail with undefined column",
+              status: "NOT_EXECUTED",
+            },
+          ],
+          warnings: [],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    render(<Home />);
+
+    fireEvent.change(screen.getByLabelText(/github repository/i), {
+      target: { value: "acme/risky-saas" },
+    });
+    fireEvent.change(screen.getByLabelText(/pull request/i), { target: { value: "42" } });
+    fireEvent.click(screen.getByRole("button", { name: /analyze change/i }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Evidence-Grounded AI Reasoning")).toBeInTheDocument(),
+    );
+    expect(screen.getByText("HYPOTHESIS • UNVERIFIED")).toBeInTheDocument();
+    expect(screen.getByText("Dropped column remains referenced")).toBeInTheDocument();
+    expect(screen.getByText("PROPOSED EXPERIMENT • NOT_EXECUTED")).toBeInTheDocument();
+    expect(screen.getByText('SELECT "legacy_status" FROM "orders" LIMIT 1;')).toBeInTheDocument();
+    expect(screen.getAllByText(/not executed yet/i).length).toBeGreaterThan(0);
   });
 });
