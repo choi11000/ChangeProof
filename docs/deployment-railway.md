@@ -92,19 +92,14 @@ To prevent unnecessary hosting costs and unused idle resources, **no product Pos
 ## 4. Current Deployment Status
 
 ```text
-STATUS: DEPLOYMENT AUTH BLOCKED
-REASON: Railway CLI authentication required (`railway login`)
+STATUS: DEPLOYED & OPERATIONAL
+PROJECT: ChangeProof (f8da94c5-6d5a-4f04-a52a-7f3e442cf0d7)
+PUBLIC WEB: https://changeproof-web-production.up.railway.app
+PUBLIC API: https://changeproof-api-production.up.railway.app
+SANDBOX POSTGRESQL: postgres.railway.internal:5432 (Private mesh only; zero public TCP exposure)
+LIVE OPENAI: Connected (gpt-4o-mini, Structured Outputs)
 ```
 
-The CLI tool `@railway/cli` version `5.49.0` is available via `npx.cmd @railway/cli`. Once Railway user authentication or a `RAILWAY_TOKEN` secret is supplied, deployment can be initiated via:
-
-```powershell
-# 1. Login to Railway
-npx @railway/cli login
-
-# 2. Link or create project
-npx @railway/cli init
-
-# 3. Deploy services
-npx @railway/cli up
-```
+The 3-service deployment topology is live and verified:
+- **API Liveness & Readiness**: `200 OK` (`/api/v1/health/live` & `/api/v1/health/ready` reporting `sandbox: ready`).
+- **Full Judge E2E Flow**: Verified in automated browser testing from "Load demo PR" to `PROVEN_FAIL` (SQLSTATE `42703`) and `PROVEN_FIXED`.

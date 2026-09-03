@@ -93,8 +93,14 @@ CONTROLLED_FIXTURES: dict[str, ControlledExperimentFixture] = {
 
 
 def get_repo_root() -> Path:
-    # apps/api/app/fixtures/experiment_registry.py -> parent x4 -> repo root
-    return Path(__file__).resolve().parents[4]
+    current = Path(__file__).resolve()
+    for candidate in [current.parent, *current.parents, Path.cwd()]:
+        if (candidate / "samples" / "risky-saas").is_dir():
+            return candidate
+    try:
+        return Path(__file__).resolve().parents[4]
+    except IndexError:
+        return Path("/app")
 
 
 def get_controlled_fixture(fixture_id: str) -> ControlledExperimentFixture | None:

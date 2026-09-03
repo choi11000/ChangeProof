@@ -182,7 +182,8 @@ class GitHubClient:
         if data.get("encoding") != "base64" or not isinstance(data.get("content"), str):
             raise GitHubFileContentUnavailable("GitHub file content encoding is unsupported")
         try:
-            decoded = base64.b64decode(data["content"], validate=True).decode("utf-8")
+            raw_b64 = "".join(data["content"].split())
+            decoded = base64.b64decode(raw_b64, validate=True).decode("utf-8")
         except (binascii.Error, UnicodeDecodeError) as error:
             raise GitHubFileContentUnavailable("GitHub file content is not valid UTF-8") from error
         return GitHubFileContent(path=path, sha=data.get("sha"), size=size, content=decoded)

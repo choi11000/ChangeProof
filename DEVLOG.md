@@ -382,6 +382,57 @@ Pull request: #5
 
 Branch: `feature/public-deployment` (stacked on `feature/submission-hardening`)
 
+## 2026-09-03 — Phase 9.1 Railway Deployment Unblock, Live OpenAI & Public End-to-End Acceptance
+
+### Added & Resolved
+
+- **Railway Project & Service Provisioning**:
+  - Project: `ChangeProof` (`f8da94c5-6d5a-4f04-a52a-7f3e442cf0d7`) under account `choi120792@gmail.com`.
+  - Topology: 3 services (`changeproof-web`, `changeproof-api`, `Postgres`).
+  - Disposable Sandbox PostgreSQL provisioned with private-mesh networking only (`postgres.railway.internal:5432`); zero public TCP exposure.
+  - Persistent product DB deliberately omitted per Phase 9 stateless MVP architecture finding.
+- **Dynamic Port & Packaging Fixes**:
+  - Fixed GitHub client base64 decoding to strip standard MIME line breaks before decoding (`"".join(data["content"].split())`).
+  - Copied synthetic fixture samples to `apps/api/samples` and made `get_repo_root()` discover `samples/risky-saas` dynamically across parent hierarchies.
+  - Added `COPY samples ./samples` to `apps/api/Dockerfile` ensuring fixture files are present in containerized environments.
+- **Production Public URLs**:
+  - Web: `https://changeproof-web-production.up.railway.app`
+  - API: `https://changeproof-api-production.up.railway.app`
+  - Liveness & Readiness: `GET /api/v1/health/live` (200 OK), `GET /api/v1/health/ready` (200 OK, `sandbox: ready`).
+- **Live OpenAI Acceptance**:
+  - Real `gpt-4o-mini` reasoning verified on live API.
+  - Successfully produced structured `FailureHypothesis` (`id: hypothesis_001`, `category: SCHEMA_CONTRACT_BREAK`, `status: PROPOSED` / `UNVERIFIED`) and 6-step `ExperimentPlan` (`template: DROPPED_COLUMN_REFERENCE`, `status: NOT_EXECUTED`).
+  - Verified in-memory planning cache hit (`cache_hit: true` on subsequent identical request) and context budgeting.
+- **Live PostgreSQL Sandbox Execution**:
+  - Executed in real Railway PostgreSQL disposable database.
+  - Provisioned ephemeral schema `cp_run_<hex12>`, executed pre-PR baseline, seed data, PR migration, and verification query.
+  - Verified `PROVEN_FAIL` with exact PostgreSQL SQLSTATE `42703` (`UndefinedColumn: column "legacy_status" does not exist`).
+  - Schema dropped with `cleanup_succeeded: true`.
+- **Live Remediation Proof**:
+  - Reran original/remediated pair against same contract digest (`contract_b58d...`).
+  - Before: `PROVEN_FAIL` (SQLSTATE `42703`), After: `PROVEN_PASS` (`legacy_status` preserved during compatibility window).
+  - Subject digest changed, contract digest identical, final verdict: `PROVEN_FIXED`.
+- **Public Browser E2E Acceptance**:
+  - Automated browser subagent executed full 10-step judge flow on `https://changeproof-web-production.up.railway.app`.
+  - Verified "Load demo PR" populated `choi11000/changeproof-demo#1`.
+  - Verified Change Facts, Dependency Evidence (`app/order_service.py` marked "Not changed in this PR"), AI Hypothesis, PostgreSQL failure reproduction, and remediation proof.
+  - 0 console script errors captured.
+- **Secret Audit**:
+  - Confirmed `.env` is git-ignored (`git check-ignore .env` PASS).
+  - Zero API keys, database credentials, or tokens in git commits.
+
+### Verification
+
+- Backend unit tests: **176 passed**, 11 skipped (sandbox integration requiring live db), **94.92% coverage** (exceeds 90% requirement).
+- Linters: Ruff clean, python compileall clean.
+- Frontend: ESLint clean, TypeScript `tsc --noEmit` clean, Vitest 6/6 passed, Next.js Turbopack production build clean.
+- Public deployment status: **ONLINE & OPERATIONAL** (`https://changeproof-web-production.up.railway.app`).
+
+### Git
+
+Branch: `feature/public-deployment` (stacked on `feature/submission-hardening`)
+
+
 
 
 

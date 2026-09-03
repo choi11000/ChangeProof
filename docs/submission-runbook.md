@@ -11,10 +11,14 @@ ChangeProof bridges the critical gap between database schema migrations and appl
 | Resource | Value / Link |
 | :--- | :--- |
 | **Main Repository** | [https://github.com/choi11000/ChangeProof](https://github.com/choi11000/ChangeProof) |
+| **Public Web App** | [https://changeproof-web-production.up.railway.app](https://changeproof-web-production.up.railway.app) |
+| **Public API Origin** | [https://changeproof-api-production.up.railway.app](https://changeproof-api-production.up.railway.app) |
+| **API Liveness** | [https://changeproof-api-production.up.railway.app/api/v1/health/live](https://changeproof-api-production.up.railway.app/api/v1/health/live) |
+| **API Readiness** | [https://changeproof-api-production.up.railway.app/api/v1/health/ready](https://changeproof-api-production.up.railway.app/api/v1/health/ready) |
 | **Public Demo PR** | [https://github.com/choi11000/changeproof-demo/pull/1](https://github.com/choi11000/changeproof-demo/pull/1) |
 | **Demo Repository** | [https://github.com/choi11000/changeproof-demo](https://github.com/choi11000/changeproof-demo) |
 | **Audited Demo Revision** | `08302ccf5e67d12eee0d6470ac1136f4f644cba5` |
-| **Deployment Status** | `DEPLOYMENT AUTH BLOCKED` (Railway credentials required for public cloud hosting; fully runnable locally via Docker or native dev tools) |
+| **Deployment Status** | `ONLINE & OPERATIONAL` (Railway public deployment with live OpenAI & Sandbox PostgreSQL) |
 
 ---
 
