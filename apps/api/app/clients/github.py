@@ -5,6 +5,7 @@ from urllib.parse import quote
 
 import httpx
 
+from app.schemas.dependency import RepositoryTree, RepositoryTreeEntry
 from app.schemas.github import (
     ChangedFile,
     ChangedFileStatus,
@@ -100,6 +101,31 @@ class GitHubClient:
             if len(data) < 100:
                 break
         return files
+
+    async def fetch_repository_tree(
+        self, repository: GitHubRepositoryRef, revision: str
+    ) -> RepositoryTree:
+        data = await self._get(
+            f"/repos/{repository.owner}/{repository.repo}/git/trees/{revision}",
+            params={"recursive": "1"},
+            not_found=GitHubRepositoryNotFound("GitHub repository or tree revision not found"),
+        )
+        if not isinstance(data, dict) or not isinstance(data.get("tree"), list):
+            raise GitHubApiUnavailable("GitHub returned an invalid tree response")
+
+        entries: list[RepositoryTreeEntry] = []
+        for item in data["tree"]:
+            if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+                continue
+            entries.append(
+                RepositoryTreeEntry(
+                    path=item["path"],
+                    sha=item.get("sha"),
+                    type=item.get("type", "blob"),
+                    size=item.get("size"),
+                )
+            )
+        return RepositoryTree(entries=entries, truncated=bool(data.get("truncated", False)))
 
     async def fetch_file_content(
         self,
