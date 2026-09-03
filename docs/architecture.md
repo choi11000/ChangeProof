@@ -7,8 +7,8 @@ ChangeProof never converts an LLM opinion directly into a verdict. Facts come fr
 ```text
 1. Change Intake             GitHub pull request                    COMPLETE
 2. Change Understanding      File classification + SQL parsing     COMPLETE
-3. Dependency Discovery      Application <-> schema                NEXT
-4. Failure Hypothesis
+3. Dependency Discovery      Application <-> schema                COMPLETE
+4. Failure Hypothesis                                               NEXT
 5. Experiment Planning
 6. Execution                 Ephemeral PostgreSQL
 7. Evidence                  Observed results
@@ -21,11 +21,13 @@ The product promise is not merely to predict failure. ChangeProof is designed to
 
 ## Runtime components
 
-- `apps/web`: Next.js App Router interface for PR input and analysis results.
-- `apps/api`: FastAPI HTTP boundary and future explicit analysis state machine.
-- `clients/github.py`: timeout-bounded GitHub REST access and safe upstream error mapping.
-- `services/pull_request_service.py`: explicit change-intake orchestration with injected clients.
+- `apps/web`: Next.js App Router interface for PR input, change facts, and dependency evidence.
+- `apps/api`: FastAPI HTTP boundary and explicit change analysis pipeline.
+- `clients/github.py`: timeout-bounded GitHub REST access for PRs, files, and repository trees.
+- `services/pull_request_service.py`: change-intake and dependency discovery orchestration.
+- `services/repository_source_service.py`: bounded source snapshot collection at PR head SHA.
 - `analyzers/file_classifier.py`: deterministic path-based classification and content policy.
+- `analyzers/dependency.py`: deterministic target extraction, reference matching, and impact summary.
 - `postgres`: persistent product data such as analyses, steps, and evidence.
 - `sandbox-postgres`: opt-in disposable target for migration validation.
 - `samples/risky-saas`: synthetic demonstration repository with known-positive risks.
@@ -38,7 +40,17 @@ The product promise is not merely to predict failure. ChangeProof is designed to
 
 `POST /api/v1/analyses/github-pr` normalizes a GitHub repository reference, verifies the repository, fetches typed PR metadata and changed files, and classifies every path. SQL migrations are fetched as complete content from the head SHA rather than parsed from a diff. Removed migrations are fetched from the base SHA for identity but are deliberately not treated as new executable SQL. One unavailable or invalid SQL file becomes a structured warning instead of failing the entire analysis.
 
-The intake records the completed steps `FETCH_PR_METADATA`, `FETCH_CHANGED_FILES`, `CLASSIFY_FILES`, `FETCH_SQL_CONTENT`, and `ANALYZE_SQL`. Logs contain only repository/PR identifiers and aggregate facts.
+## Cross-layer dependency discovery
+
+`DependencyAnalyzer` and `RepositorySourceService` bridge schema changes and application source code. The pipeline extracts dependency targets from destructive and schema-altering SQL changes (`DROP_COLUMN`, `ALTER_COLUMN_TYPE`, nullability/default modifications, and `DROP_TABLE`).
+
+Instead of inspecting only PR changed files, ChangeProof fetches the complete repository tree snapshot at the PR `head_sha`. Candidate source files are filtered through strict content policies (excluding secrets, keys, lockfiles, and binaries) and bounded by configurable safety limits (300 files, 256 KiB per file, 5 MiB total content).
+
+References are matched using deterministic identifier boundaries and categorized into `QUALIFIED_REFERENCE` (direct property, index, or dot access), `TABLE_AND_COLUMN_CONTEXT` (vicinity co-occurrence), and `COLUMN_IDENTIFIER` / `TABLE_IDENTIFIER` (bare symbol reference). Every match produces a `DependencyEvidence` record with path, line number, match kind, secret-redacted excerpt, and whether the referencing file was changed in the PR or existed previously in the repository.
+
+This phase provides deterministic source-reference evidence, not compiler-level semantic dependency proof.
+
+The intake records the completed steps `FETCH_PR_METADATA`, `FETCH_CHANGED_FILES`, `CLASSIFY_FILES`, `FETCH_SQL_CONTENT`, `ANALYZE_SQL`, `EXTRACT_DEPENDENCY_TARGETS`, `FETCH_REPOSITORY_TREE`, `FETCH_APPLICATION_CONTENT`, `DISCOVER_DEPENDENCIES`, and `SUMMARIZE_IMPACT`. Logs contain only repository/PR identifiers and aggregate facts.
 
 ## Planned analysis state
 

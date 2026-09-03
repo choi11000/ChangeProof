@@ -115,3 +115,56 @@ Commits:
 
 - `c9adba5 feat: add GitHub pull request intake pipeline`
 - `0224e9d feat: connect dashboard to PR analysis`
+
+## 2026-09-03 — Phase 4 Cross-Layer Dependency Discovery & Impact Evidence
+
+### Added
+
+- Typed dependency target, match kind, evidence, impact summary, repository tree, and source document contracts
+- GitHub client repository tree retrieval at PR `head_sha` (`GET /repos/{owner}/{repo}/git/trees/{head_sha}?recursive=1`)
+- Bounded repository source collection (`RepositorySourceService`) with file count (300), file size (256 KiB), and total bytes (5 MiB) limits
+- Graceful degradation for truncated trees and scan limit overflows via typed analysis warnings
+- Deterministic pure dependency analyzer (`DependencyAnalyzer`) supporting `QUALIFIED_REFERENCE`, `TABLE_AND_COLUMN_CONTEXT`, `COLUMN_IDENTIFIER`, and `TABLE_IDENTIFIER`
+- Schema dependency target extraction from `DROP_COLUMN`, `ALTER_COLUMN_TYPE`, `SET_NOT_NULL`, `DROP_NOT_NULL`, `SET_DEFAULT`, `DROP_DEFAULT`, and `DROP_TABLE`
+- Support for snake_case, camelCase, and PascalCase identifier variants without probabilistic or LLM reasoning
+- Secret redaction for evidence code excerpts (`redact_lines`)
+- Acceptance test verifying reference discovery in unchanged application files (`order.legacy_status` in `app/order_service.py` with `changed_in_pull_request=False`)
+- Frontend Impact Surface metrics and Dependency Evidence list with "Not changed in this PR" badges and match kind indicators
+- Architecture decision record `docs/adr/006-dependency-discovery.md`
+
+### Decisions
+
+- Repository tree snapshot is fetched at exact PR `head_sha` to examine the candidate PR state rather than changed files only.
+- Deterministic reference matching is used; no LLMs, embeddings, vector databases, or fake confidence percentages.
+- Exact and bounded text/context matches are used instead of aggressive fuzzy or semantic matching.
+- Content policies from Phase 3 (skipping `.env`, keys, secrets, lockfiles, and binaries) are reused across all source scanning.
+- Dynamic tracking of `completed_steps` records only successfully completed pipeline stages.
+
+### Tests
+
+- API: `pytest` PASS (85 tests, 97.16% coverage)
+- API: `ruff check .` PASS
+- API: Python bytecode compilation PASS
+- Web: `npm ci`, ESLint, TypeScript typecheck, Vitest (3 tests), and production build PASS
+- Web: `npm audit` PASS (0 vulnerabilities)
+- Browser smoke: live web/API interaction and error flow PASS with no console errors
+- Docker: NOT AVAILABLE on this host
+
+### Known Limitations
+
+- Textual and contextual matching provides reference evidence, not compiler-level semantic dependency proof.
+- FastAPI/Starlette TestClient emits two upstream deprecation warnings involving `httpx`.
+- Docker is not installed on this host.
+
+### Git
+
+Branch: `feature/dependency-discovery` (stacked on `feature/github-pr-intake`)
+
+Commits:
+
+- `4d9f539 feat: add repository source collection and tree acquisition`
+- `0f8d091 feat: discover application references to schema changes`
+- `6cfd26c test: cover cross-layer dependency discovery`
+- `1461df1 docs: document dependency evidence architecture`
+
+
