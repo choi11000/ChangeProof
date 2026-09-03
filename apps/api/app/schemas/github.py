@@ -2,6 +2,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+from app.schemas.dependency import DependencyEvidence, DependencyTarget, ImpactSummary
 from app.schemas.sql_change import SqlChange
 
 
@@ -94,6 +95,11 @@ class AnalysisWarningCode(StrEnum):
     SKIPPED_TOO_LARGE = "SKIPPED_TOO_LARGE"
     REMOVED_SQL_NOT_ANALYZED = "REMOVED_SQL_NOT_ANALYZED"
     SQL_PARSE_ERROR = "SQL_PARSE_ERROR"
+    REPOSITORY_TREE_TRUNCATED = "REPOSITORY_TREE_TRUNCATED"
+    SOURCE_SCAN_LIMIT_REACHED = "SOURCE_SCAN_LIMIT_REACHED"
+    SOURCE_FILE_TOO_LARGE = "SOURCE_FILE_TOO_LARGE"
+    SOURCE_CONTENT_UNAVAILABLE = "SOURCE_CONTENT_UNAVAILABLE"
+    DEPENDENCY_SCAN_INCOMPLETE = "DEPENDENCY_SCAN_INCOMPLETE"
 
 
 class AnalysisWarning(BaseModel):
@@ -108,6 +114,11 @@ class AnalysisStep(StrEnum):
     CLASSIFY_FILES = "CLASSIFY_FILES"
     FETCH_SQL_CONTENT = "FETCH_SQL_CONTENT"
     ANALYZE_SQL = "ANALYZE_SQL"
+    EXTRACT_DEPENDENCY_TARGETS = "EXTRACT_DEPENDENCY_TARGETS"
+    FETCH_REPOSITORY_TREE = "FETCH_REPOSITORY_TREE"
+    FETCH_APPLICATION_CONTENT = "FETCH_APPLICATION_CONTENT"
+    DISCOVER_DEPENDENCIES = "DISCOVER_DEPENDENCIES"
+    SUMMARIZE_IMPACT = "SUMMARIZE_IMPACT"
 
 
 class PullRequestAnalysis(BaseModel):
@@ -115,6 +126,9 @@ class PullRequestAnalysis(BaseModel):
     pull_request: PullRequestMetadata
     changed_files: list[ClassifiedFile]
     sql_files: list[SqlFileAnalysis]
+    dependency_targets: list[DependencyTarget] = Field(default_factory=list)
+    dependency_evidence: list[DependencyEvidence] = Field(default_factory=list)
+    impact_summary: ImpactSummary | None = None
     warnings: list[AnalysisWarning] = Field(default_factory=list)
     completed_steps: list[AnalysisStep] = Field(default_factory=list)
 

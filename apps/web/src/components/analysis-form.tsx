@@ -11,6 +11,44 @@ type FileCategory =
   | "DOCUMENTATION"
   | "OTHER";
 
+type DependencyMatchKind =
+  | "QUALIFIED_REFERENCE"
+  | "TABLE_AND_COLUMN_CONTEXT"
+  | "COLUMN_IDENTIFIER"
+  | "TABLE_IDENTIFIER";
+
+type DependencyTarget = {
+  type: "TABLE" | "COLUMN";
+  table: string;
+  column?: string | null;
+};
+
+type DependencyEvidence = {
+  target: DependencyTarget;
+  path: string;
+  line: number;
+  match_kind: DependencyMatchKind;
+  excerpt: string;
+  source_scope: "APPLICATION" | "TEST";
+  changed_in_pull_request: boolean;
+};
+
+type ImpactSummary = {
+  targets: number;
+  application_files_with_references: number;
+  test_files_with_references: number;
+  qualified_references: number;
+  contextual_references: number;
+  identifier_references: number;
+  scan_complete: boolean;
+};
+
+type AnalysisWarning = {
+  code: string;
+  message: string;
+  path?: string | null;
+};
+
 type AnalysisResult = {
   pull_request: { number: number; title: string; changed_files: number; html_url: string };
   changed_files: Array<{
@@ -25,9 +63,28 @@ type AnalysisResult = {
     };
     error: string | null;
   }>;
+  dependency_targets: DependencyTarget[];
+  dependency_evidence: DependencyEvidence[];
+  impact_summary: ImpactSummary | null;
+  warnings: AnalysisWarning[];
 };
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+function matchKindLabel(kind: DependencyMatchKind): { label: string; className: string } {
+  switch (kind) {
+    case "QUALIFIED_REFERENCE":
+      return { label: "Direct Reference", className: "badge badge-direct" };
+    case "TABLE_AND_COLUMN_CONTEXT":
+      return { label: "Table Context", className: "badge badge-context" };
+    case "COLUMN_IDENTIFIER":
+      return { label: "Potential Identifier", className: "badge badge-potential" };
+    case "TABLE_IDENTIFIER":
+      return { label: "Table Identifier", className: "badge badge-direct" };
+    default:
+      return { label: kind, className: "badge" };
+  }
+}
 
 export function AnalysisForm() {
   const [repository, setRepository] = useState("");
@@ -133,6 +190,99 @@ export function AnalysisForm() {
                 ))}
               </article>
             ))}
+          </div>
+
+          <hr className="section-divider" />
+
+          {/* Impact Surface Section */}
+          <div className="evidence-section" aria-label="Impact Surface">
+            <div className="evidence-heading">
+              <div>
+                <p className="eyebrow">IMPACT SURFACE</p>
+                <h3>Cross-Layer Application References</h3>
+              </div>
+              {result.impact_summary && !result.impact_summary.scan_complete && (
+                <span className="badge badge-warning">
+                  Limited Scan (Incomplete)
+                </span>
+              )}
+            </div>
+
+            {result.impact_summary && (
+              <dl className="result-counts">
+                <div>
+                  <dt>Target entities</dt>
+                  <dd>{result.impact_summary.targets}</dd>
+                </div>
+                <div>
+                  <dt>App files affected</dt>
+                  <dd>{result.impact_summary.application_files_with_references}</dd>
+                </div>
+                <div>
+                  <dt>Direct references</dt>
+                  <dd>{result.impact_summary.qualified_references}</dd>
+                </div>
+                <div>
+                  <dt>Potential references</dt>
+                  <dd>
+                    {result.impact_summary.contextual_references +
+                      result.impact_summary.identifier_references}
+                  </dd>
+                </div>
+              </dl>
+            )}
+          </div>
+
+          {/* Dependency Evidence List */}
+          <div className="evidence-section" aria-label="Dependency Evidence">
+            <div className="evidence-heading">
+              <div>
+                <p className="eyebrow">DEPENDENCY EVIDENCE</p>
+                <h3>Deterministic Source Code Matches</h3>
+              </div>
+            </div>
+
+            {result.dependency_evidence && result.dependency_evidence.length > 0 ? (
+              <div className="evidence-list">
+                {result.dependency_evidence.map((evidence, idx) => {
+                  const matchMeta = matchKindLabel(evidence.match_kind);
+                  const targetLabel = [
+                    evidence.target.table,
+                    evidence.target.column,
+                  ]
+                    .filter(Boolean)
+                    .join(".");
+
+                  return (
+                    <article key={`${evidence.path}-${evidence.line}-${idx}`} className="evidence-card">
+                      <div className="evidence-meta">
+                        <div className="evidence-path">
+                          <strong>{evidence.path}</strong>:{evidence.line}
+                        </div>
+                        <div className="evidence-badges">
+                          <span className="evidence-target">{targetLabel}</span>
+                          <span className={matchMeta.className}>{matchMeta.label}</span>
+                          {evidence.changed_in_pull_request ? (
+                            <span className="badge badge-changed">Changed in this PR</span>
+                          ) : (
+                            <span className="badge badge-unchanged">Not changed in this PR</span>
+                          )}
+                        </div>
+                      </div>
+                      <pre className="evidence-excerpt">
+                        <code>{evidence.excerpt}</code>
+                      </pre>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="empty-state">
+                {result.impact_summary?.scan_complete
+                  ? "No source references found in scanned application files."
+                  : "No references found in scanned subset. Source analysis was limited."}
+              </div>
+            )}
           </div>
         </section>
       )}

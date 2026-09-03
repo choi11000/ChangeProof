@@ -2,6 +2,11 @@ import logging
 import re
 from urllib.parse import urlparse
 
+from app.analyzers.dependency import (
+    DependencyAnalyzer,
+    extract_dependency_targets,
+    summarize_impact,
+)
 from app.analyzers.file_classifier import classify_file
 from app.analyzers.sql_migration import SqlMigrationParseError, SqlMigrationParser
 from app.clients.github import GitHubClient, GitHubError, GitHubFileContentUnavailable
@@ -20,6 +25,7 @@ from app.schemas.github import (
     SqlAnalysisResult,
     SqlFileAnalysis,
 )
+from app.services.repository_source_service import RepositorySourceService
 
 logger = logging.getLogger(__name__)
 REPOSITORY_PART = re.compile(r"^[A-Za-z0-9_.-]+$")
@@ -57,17 +63,28 @@ def parse_repository_reference(value: str) -> GitHubRepositoryRef:
 
 
 class PullRequestService:
-    def __init__(self, github_client: GitHubClient, sql_parser: SqlMigrationParser) -> None:
+    def __init__(
+        self,
+        github_client: GitHubClient,
+        sql_parser: SqlMigrationParser,
+        source_service: RepositorySourceService | None = None,
+        dependency_analyzer: DependencyAnalyzer | None = None,
+    ) -> None:
         self._github = github_client
         self._sql_parser = sql_parser
+        self._source_service = source_service or RepositorySourceService(github_client)
+        self._dependency_analyzer = dependency_analyzer or DependencyAnalyzer()
 
     async def analyze(self, repository_input: str, pull_request: int) -> PullRequestAnalysis:
+        completed_steps: list[AnalysisStep] = []
         repository = parse_repository_reference(repository_input)
         await self._github.verify_repository(repository)
         metadata = await self._github.fetch_pull_request(repository, pull_request)
+        completed_steps.append(AnalysisStep.FETCH_PR_METADATA)
         self._log_step(AnalysisStep.FETCH_PR_METADATA, repository.full_name, pull_request)
 
         files = await self._github.fetch_changed_files(repository, pull_request)
+        completed_steps.append(AnalysisStep.FETCH_CHANGED_FILES)
         self._log_step(
             AnalysisStep.FETCH_CHANGED_FILES,
             repository.full_name,
@@ -75,6 +92,7 @@ class PullRequestService:
             changed_file_count=len(files),
         )
         classified = [classify_file(file) for file in files]
+        completed_steps.append(AnalysisStep.CLASSIFY_FILES)
         self._log_step(
             AnalysisStep.CLASSIFY_FILES,
             repository.full_name,
@@ -102,6 +120,9 @@ class PullRequestService:
             sql_files.append(analysis)
             warnings.extend(file_warnings)
 
+        if any(item.category is FileCategory.SQL_MIGRATION for item in classified):
+            completed_steps.append(AnalysisStep.FETCH_SQL_CONTENT)
+        completed_steps.append(AnalysisStep.ANALYZE_SQL)
         self._log_step(
             AnalysisStep.ANALYZE_SQL,
             repository.full_name,
@@ -109,13 +130,76 @@ class PullRequestService:
             sql_success_count=sum(item.analysis is not None for item in sql_files),
             sql_failure_count=sum(item.error is not None for item in sql_files),
         )
+
+        # Extract dependency targets
+        targets = extract_dependency_targets(sql_files)
+        completed_steps.append(AnalysisStep.EXTRACT_DEPENDENCY_TARGETS)
+        self._log_step(
+            AnalysisStep.EXTRACT_DEPENDENCY_TARGETS,
+            repository.full_name,
+            pull_request,
+            target_count=len(targets),
+        )
+
+        # Fetch repository tree & application content at head_sha
+        changed_paths = {file.path for file in files}
+        tree, snapshot = await self._source_service.collect(
+            repository, metadata.head_sha, changed_paths
+        )
+        completed_steps.append(AnalysisStep.FETCH_REPOSITORY_TREE)
+        self._log_step(
+            AnalysisStep.FETCH_REPOSITORY_TREE,
+            repository.full_name,
+            pull_request,
+            tree_entry_count=len(tree.entries),
+            truncated=tree.truncated,
+        )
+
+        completed_steps.append(AnalysisStep.FETCH_APPLICATION_CONTENT)
+        self._log_step(
+            AnalysisStep.FETCH_APPLICATION_CONTENT,
+            repository.full_name,
+            pull_request,
+            source_document_count=len(snapshot.documents),
+        )
+        warnings.extend(snapshot.warnings)
+
+        # Discover dependencies
+        evidences = self._dependency_analyzer.analyze(targets, snapshot.documents)
+        completed_steps.append(AnalysisStep.DISCOVER_DEPENDENCIES)
+        self._log_step(
+            AnalysisStep.DISCOVER_DEPENDENCIES,
+            repository.full_name,
+            pull_request,
+            evidence_count=len(evidences),
+        )
+
+        # Summarize impact
+        impact_summary = summarize_impact(
+            targets, evidences, scan_complete=snapshot.scan_complete
+        )
+        completed_steps.append(AnalysisStep.SUMMARIZE_IMPACT)
+        self._log_step(
+            AnalysisStep.SUMMARIZE_IMPACT,
+            repository.full_name,
+            pull_request,
+            targets=impact_summary.targets,
+            application_files_with_references=impact_summary.application_files_with_references,
+            test_files_with_references=impact_summary.test_files_with_references,
+            qualified_references=impact_summary.qualified_references,
+            scan_complete=impact_summary.scan_complete,
+        )
+
         return PullRequestAnalysis(
             repository=repository,
             pull_request=metadata,
             changed_files=classified,
             sql_files=sql_files,
+            dependency_targets=targets,
+            dependency_evidence=evidences,
+            impact_summary=impact_summary,
             warnings=warnings,
-            completed_steps=list(AnalysisStep),
+            completed_steps=completed_steps,
         )
 
     async def _analyze_sql_file(
