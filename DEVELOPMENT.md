@@ -11,6 +11,8 @@
 
 Copy `.env.example` to `.env`. The checked-in values are local-development defaults; secrets remain blank.
 
+`GITHUB_TOKEN` is optional for public repositories and recommended to avoid the anonymous API rate limit. Private repository analysis requires a token with the narrowest read-only repository access possible. Never place a real token in source, tests, logs, or committed documentation.
+
 ## API
 
 ```bash
@@ -21,6 +23,14 @@ python -m pip install -e ".[dev]"
 pytest
 ruff check .
 uvicorn app.main:app --reload
+```
+
+Analyze a pull request after the API starts:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/analyses/github-pr \
+  -H "Content-Type: application/json" \
+  -d '{"repository":"owner/repository","pull_request":42}'
 ```
 
 On Linux/macOS, activate with `source .venv/bin/activate`.

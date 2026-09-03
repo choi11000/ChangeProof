@@ -66,3 +66,52 @@ Commit: `c64e3b8 feat: bootstrap ChangeProof development environment`
 Branch: `feature/sql-change-parser`
 
 Commit: `f809e1e feat: implement SQL migration parser`
+
+## 2026-09-03 — Phase 3 GitHub PR intake
+
+### Added
+
+- GitHub repository reference normalization and validation
+- Timeout-bounded GitHub REST client for repository, PR, changed-file, and revision content retrieval
+- Typed GitHub metadata, classified-file, warning, SQL analysis, and pipeline-step contracts
+- Deterministic changed-file classification with explanations
+- Full head-revision migration analysis through the existing Phase 2 SQL parser
+- Base-revision handling for removed migrations and per-file partial failure isolation
+- Secret-bearing patch and SQL redaction, protected-file policies, binary exclusions, and 1 MiB SQL limit
+- Typed `POST /api/v1/analyses/github-pr` endpoint and safe HTTP error mapping
+- Existing frontend form integration with loading, error, summary, and SQL change results
+- Mocked GitHub client, classifier, security, API, and end-to-end PR pipeline tests
+
+### Decisions
+
+- GitHub REST with injected `httpx.AsyncClient` is used instead of a full SDK or GraphQL.
+- Phase 3 is stacked on unmerged `feature/sql-change-parser`; no automatic merge was performed.
+- SQL analysis uses full content at the PR head SHA, never the changed-files patch.
+- Removed migrations are identified from base SHA but not analyzed as executable changes.
+- Network tests use `httpx.MockTransport`; no real token or network dependency is present.
+
+### Tests
+
+- API: `pytest` PASS (64 tests, 96.53% coverage)
+- API: `ruff check .` PASS
+- API: Python bytecode compilation PASS
+- Web: clean `npm ci`, ESLint, TypeScript, Vitest (2 tests), and production build PASS
+- Web: npm audit PASS (0 vulnerabilities)
+- Browser: live web/API error and success flows PASS with no console errors
+- GitHub live smoke: public PR metadata and three changed files fetched/classified successfully
+- Docker: NOT AVAILABLE on this host
+
+### Known Limitations
+
+- FastAPI/Starlette TestClient emits two upstream deprecation warnings involving `httpx`; production GitHub REST usage still requires `httpx`, so dependency churn was deferred.
+- Docker is not installed on this host; sandbox execution is outside Phase 3 and was not run.
+- GitHub changed-files pagination is capped at 3,000 files, matching GitHub's endpoint limit.
+
+### Git
+
+Branch: `feature/github-pr-intake` (stacked on `feature/sql-change-parser`)
+
+Commits:
+
+- `c9adba5 feat: add GitHub pull request intake pipeline`
+- `0224e9d feat: connect dashboard to PR analysis`
