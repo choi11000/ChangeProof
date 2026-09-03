@@ -79,6 +79,11 @@ class CachedHypothesisGenerator:
             if task is None:
                 task = asyncio.create_task(self._call_upstream(context, fingerprint))
                 self._inflight[fingerprint] = task
+                task.add_done_callback(
+                    lambda completed, key=fingerprint, source=context: self._finalize_task(
+                        key, source, completed
+                    )
+                )
         try:
             result = await asyncio.shield(task)
             if owner and self._is_cacheable(result, context):
@@ -95,6 +100,22 @@ class CachedHypothesisGenerator:
                 async with self._lock:
                     if self._inflight.get(fingerprint) is task:
                         self._inflight.pop(fingerprint, None)
+
+    def _finalize_task(
+        self,
+        fingerprint: str,
+        context: FailurePlanningContext,
+        task: asyncio.Task[HypothesisGenerationResult],
+    ) -> None:
+        if not task.cancelled() and task.exception() is None:
+            result = task.result()
+            if self._is_cacheable(result, context):
+                self._cache[fingerprint] = (self.clock() + self.ttl_seconds, result)
+                self._cache.move_to_end(fingerprint)
+                while len(self._cache) > self.max_entries:
+                    self._cache.popitem(last=False)
+        if self._inflight.get(fingerprint) is task:
+            self._inflight.pop(fingerprint, None)
 
     async def _call_upstream(
         self, context: FailurePlanningContext, fingerprint: str
