@@ -316,6 +316,46 @@ Commits:
 - Same-experiment re-execution implementation: **COMPLETE**
 - End-to-end PostgreSQL proof: **NOT VERIFIED**
 
+## 2026-09-03 — Phase 8 CI Runtime Proof, Public Service Hardening & AI Cost Guard
+
+### Added
+
+- Four-job GitHub Actions workflow for backend unit/coverage, PostgreSQL 17.6 integration, frontend quality/build/audit, and API/web container plus Compose validation
+- CI-only required-sandbox gate preventing an unavailable database from becoming a green skipped suite
+- Deterministic AI context budgets, target-aware evidence selection, transparent truncation statistics, output-token ceiling, usage metadata, versioned fingerprints, bounded TTL cache, and async single-flight
+- Public-repository-only GitHub metadata boundary with a non-enumerating private repository error
+- Endpoint-specific bounded per-client limits and one-slot-per-proof sandbox concurrency control
+- Configurable CORS/docs, production setting validation, request correlation, sanitized unexpected errors, liveness, and sandbox readiness
+- Build-time demo repository/PR configuration and a non-executing **Load demo PR** action
+- ADR 010 and provider-neutral deployment/secret/spend guidance
+
+### Actual PostgreSQL runtime proof
+
+GitHub Actions run `33747973539`, job `backend-postgres-integration`, connected through psycopg to a real `postgres:17.6-alpine` service. Result: **11 passed, 0 skipped**.
+
+- DROP COLUMN: SQLSTATE `42703`, `PROVEN_FAIL`
+- DROP TABLE: SQLSTATE `42P01`, `PROVEN_FAIL`
+- SET NOT NULL: SQLSTATE `23502`, `PROVEN_FAIL`
+- ALTER TYPE: SQLSTATE `22001`, `PROVEN_FAIL`
+- SAFE ADDITIVE: `PROVEN_PASS`
+- Four remediation pairs: before `PROVEN_FAIL`, identical contract digest, different subject digest, after `PROVEN_PASS`, aggregate `PROVEN_FIXED`
+- Cleanup metadata query: zero remaining `cp_run_%` schemas
+- Concurrent safe-additive runs: isolated schemas and `PROVEN_PASS`
+
+### Verification
+
+- CI backend unit: **168 passed**, 11 deselected, **94.91% coverage**, Ruff and compileall PASS
+- CI PostgreSQL integration: **11 passed**, no sandbox skip
+- CI frontend: lint, typecheck, **6 tests**, build, and audit PASS
+- CI container build: API image, web image, and Compose config PASS
+- Local Docker: unavailable; local sandbox tests skip by design
+
+### Git
+
+Branch: `feature/submission-hardening` (stacked on `feature/remediation-proof-loop`)
+
+Pull request: #5
+
 
 
 

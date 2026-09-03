@@ -10,12 +10,14 @@ ChangeProof never converts an LLM opinion directly into a verdict. Facts come fr
 3. Dependency Discovery      Application <-> schema                COMPLETE
 4. Failure Hypothesis        Evidence-grounded AI reasoning        COMPLETE
 5. Experiment Planning       Deterministic ExperimentCompiler      COMPLETE
-6. Execution                 Ephemeral PostgreSQL                  IMPLEMENTED; RUNTIME BLOCKED
-7. Evidence                  Observed SQLSTATE results             IMPLEMENTED; RUNTIME BLOCKED
-8. Remediation               Deterministic schema fix              IMPLEMENTED; RUNTIME BLOCKED
-9. Re-execution              Same experiment                       IMPLEMENTED; RUNTIME BLOCKED
-10. Proof                    Server-authoritative invariants       IMPLEMENTED; RUNTIME BLOCKED
+6. Execution                 Ephemeral PostgreSQL                  COMPLETE
+7. Evidence                  Observed SQLSTATE results             COMPLETE
+8. Remediation               Deterministic schema fix              COMPLETE
+9. Re-execution              Same experiment                       COMPLETE
+10. Proof                    Server-authoritative invariants       COMPLETE
 ```
+
+The runtime status is backed by GitHub Actions run `33747973539`: PostgreSQL 17.6 executed all 11 sandbox tests without skips, including four exact SQLSTATE failures, one safe additive pass, cleanup inspection, concurrency isolation, and all four remediation pairs.
 
 The product promise is not merely to predict failure:
 > Don't predict the failure. Reproduce it before production.

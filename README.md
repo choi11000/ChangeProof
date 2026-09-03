@@ -95,7 +95,8 @@ Provider-neutral production configuration and secret guidance are in [docs/deplo
 | 3 — GitHub PR intake | Complete on stacked `feature/github-pr-intake`; not merged to `main` |
 | 4 — Dependency discovery | Complete on stacked `feature/dependency-discovery`; not merged to `main` |
 | 5 — Failure hypothesis & experiment planning | Complete on stacked `feature/failure-experiment-planning`; not merged to `main` |
-| 6 — Ephemeral PostgreSQL experiment execution | Implementation complete on stacked `feature/postgres-experiment-execution`; real PostgreSQL acceptance blocked because Docker is unavailable on the development host |
-| 7 — Deterministic remediation & same-experiment proof | Implementation complete on stacked `feature/remediation-proof-loop`; end-to-end PostgreSQL proof not verified because Docker is unavailable on the development host |
+| 6 — Ephemeral PostgreSQL experiment execution | Complete; PostgreSQL 17.6 runtime acceptance passed in GitHub Actions |
+| 7 — Deterministic remediation & same-experiment proof | Complete; all four before/after remediation pairs passed in PostgreSQL CI |
+| 8 — Runtime proof & public service hardening | Complete on stacked `feature/submission-hardening`; CI, cost, access, deployment, and demo guards verified |
 
 See [DEVLOG.md](DEVLOG.md) for verified results and branch dependencies.
