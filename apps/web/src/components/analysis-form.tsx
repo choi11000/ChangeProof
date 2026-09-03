@@ -1,7 +1,20 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import { Translations, useI18n } from "@/lib/i18n";
+import {
+  Translations,
+  translateCategory,
+  translateHypothesisContent,
+  translateObservation,
+  translateRemediationDescription,
+  translateRunSummary,
+  translateStatus,
+  translateStepDescription,
+  translateStepStatus,
+  translateStepType,
+  translateTemplate,
+  useI18n,
+} from "@/lib/i18n";
 
 type FileCategory =
   | "SQL_MIGRATION"
@@ -195,7 +208,7 @@ function matchKindLabel(
 }
 
 export function AnalysisForm() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [repository, setRepository] = useState("");
   const [pullRequest, setPullRequest] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -521,24 +534,27 @@ export function AnalysisForm() {
                   const remediationProof = matchingPlan
                     ? remediationProofs[matchingPlan.id]
                     : null;
+                  const translatedHypothesis = translateHypothesisContent(hypothesis, lang);
 
                   return (
                     <article key={hypothesis.id} className="hypothesis-card">
                       <div className="hypothesis-header">
                         <span className="badge badge-hypothesis">
-                          {t.hypothesisBadge} {hypothesis.status}
+                          {t.hypothesisBadge} {translateStatus(hypothesis.status, lang)}
                         </span>
-                        <span className="hypothesis-category">{hypothesis.category}</span>
+                        <span className="hypothesis-category">
+                          {translateCategory(hypothesis.category, lang)}
+                        </span>
                       </div>
-                      <h4>{hypothesis.title}</h4>
-                      <p className="hypothesis-statement">{hypothesis.statement}</p>
+                      <h4>{translatedHypothesis.title}</h4>
+                      <p className="hypothesis-statement">{translatedHypothesis.statement}</p>
                       <div className="hypothesis-meta">
                         <div>
-                          <strong>{t.rationaleLabel}</strong> {hypothesis.rationale}
+                          <strong>{t.rationaleLabel}</strong> {translatedHypothesis.rationale}
                         </div>
                         <div>
                           <strong>{t.expectedFailureLabel}</strong>{" "}
-                          <code>{hypothesis.expected_failure_mode}</code>
+                          <code>{translatedHypothesis.expected_failure_mode}</code>
                         </div>
                       </div>
 
@@ -547,10 +563,12 @@ export function AnalysisForm() {
                           <div className="plan-header">
                             <div>
                               <span className="badge badge-plan">
-                                {t.proposedExperimentBadge} {matchingPlan.status}
+                                {t.proposedExperimentBadge}{" "}
+                                {translateStatus(matchingPlan.status, lang)}
                               </span>
                               <h5>
-                                {t.templateLabel} {matchingPlan.template}
+                                {t.templateLabel}{" "}
+                                {translateTemplate(matchingPlan.template, lang)}
                               </h5>
                             </div>
                             <span className="plan-status-notice">
@@ -559,12 +577,14 @@ export function AnalysisForm() {
                           </div>
                           <p className="plan-observation">
                             <strong>{t.expectedObservationLabel}</strong>{" "}
-                            {matchingPlan.expected_observation}
+                            {translateObservation(matchingPlan.expected_observation, lang)}
                           </p>
                           <ol className="plan-steps">
                             {matchingPlan.steps.map((step) => (
                               <li key={step.order}>
-                                <span className="step-desc">{step.description}</span>
+                                <span className="step-desc">
+                                  {translateStepDescription(step.description, lang)}
+                                </span>
                                 {step.sql && <code className="step-sql">{step.sql}</code>}
                               </li>
                             ))}
@@ -639,7 +659,7 @@ export function AnalysisForm() {
                               </div>
 
                               <p className="run-summary">
-                                {executionRun.summary}
+                                {translateRunSummary(executionRun.summary, lang)}
                                 {executionRun.verdict === "PROVEN_PASS" && (
                                   <span className="run-subnote">{t.passSubnote}</span>
                                 )}
@@ -655,10 +675,10 @@ export function AnalysisForm() {
                                       <strong>
                                         {t.stepLabel} {step.order}:
                                       </strong>{" "}
-                                      {step.type}
+                                      {translateStepType(step.type, lang)}
                                     </div>
                                     <div>
-                                      <span>{step.status}</span> ({step.duration_ms}ms)
+                                      <span>{translateStepStatus(step.status, lang)}</span> ({step.duration_ms}ms)
                                     </div>
                                     {step.status === "FAILED" && (
                                       <div className="step-error-detail">
@@ -732,7 +752,12 @@ export function AnalysisForm() {
                                     >
                                       {remediationProof.verdict.replace("_", " ")}
                                     </span>
-                                    <h5>{remediationProof.description}</h5>
+                                    <h5>
+                                      {translateRemediationDescription(
+                                        remediationProof.description,
+                                        lang,
+                                      )}
+                                    </h5>
                                     <div className="proof-comparison">
                                       <div>
                                         <strong>{t.beforeLabel}</strong>

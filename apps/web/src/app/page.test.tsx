@@ -333,12 +333,19 @@ describe("Home", () => {
     fireEvent.change(screen.getByLabelText(/풀 리퀘스트/i), { target: { value: "42" } });
     fireEvent.click(screen.getByRole("button", { name: /변경사항 분석/i }));
 
-    // Run experiment button appears in Korean
+    // Verify translated hypothesis and plan in Korean
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: /격리된 postgresql에서 실험 실행/i }),
+        screen.getByText(/삭제된 컬럼이 애플리케이션 코드에 여전히 참조되고 있음/i),
       ).toBeInTheDocument(),
     );
+    expect(screen.getByText(/스키마 계약 위반/i)).toBeInTheDocument();
+    expect(screen.getByText(/삭제된 컬럼 참조 검증/i)).toBeInTheDocument();
+
+    // Run experiment button appears in Korean
+    expect(
+      screen.getByRole("button", { name: /격리된 postgresql에서 실험 실행/i }),
+    ).toBeInTheDocument();
 
     fireEvent.click(
       screen.getByRole("button", { name: /격리된 postgresql에서 실험 실행/i }),

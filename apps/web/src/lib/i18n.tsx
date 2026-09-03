@@ -402,3 +402,249 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 export function useI18n(): I18nContextType {
   return useContext(I18nContext);
 }
+
+export function translateCategory(category: string, lang: Language): string {
+  if (lang !== "ko") return category;
+  switch (category) {
+    case "SCHEMA_CONTRACT_BREAK":
+      return "스키마 계약 위반 (SCHEMA_CONTRACT_BREAK)";
+    case "MIGRATION_COMPATIBILITY":
+      return "마이그레이션 호환성 위반 (MIGRATION_COMPATIBILITY)";
+    case "NULLABILITY_COMPATIBILITY":
+      return "NULL 제약조건 호환성 위반 (NULLABILITY_COMPATIBILITY)";
+    case "TYPE_COMPATIBILITY":
+      return "데이터 타입 호환성 위반 (TYPE_COMPATIBILITY)";
+    case "TABLE_CONTRACT_BREAK":
+      return "테이블 계약 위반 (TABLE_CONTRACT_BREAK)";
+    default:
+      return category;
+  }
+}
+
+export function translateTemplate(template: string, lang: Language): string {
+  if (lang !== "ko") return template;
+  switch (template) {
+    case "DROPPED_COLUMN_REFERENCE":
+      return "삭제된 컬럼 참조 검증 (DROPPED_COLUMN_REFERENCE)";
+    case "DROPPED_TABLE_REFERENCE":
+      return "삭제된 테이블 참조 검증 (DROPPED_TABLE_REFERENCE)";
+    case "NOT_NULL_COMPATIBILITY":
+      return "NOT NULL 제약조건 호환성 검증 (NOT_NULL_COMPATIBILITY)";
+    case "ALTER_TYPE_COMPATIBILITY":
+      return "컬럼 타입 변경 호환성 검증 (ALTER_TYPE_COMPATIBILITY)";
+    case "MIGRATION_APPLY":
+      return "마이그레이션 적용 검증 (MIGRATION_APPLY)";
+    default:
+      return template;
+  }
+}
+
+export function translateStatus(status: string, lang: Language): string {
+  if (lang !== "ko") return status;
+  switch (status) {
+    case "PROPOSED":
+      return "제안됨 (PROPOSED)";
+    case "UNVERIFIED":
+      return "미검증 (UNVERIFIED)";
+    case "NOT_EXECUTED":
+      return "미실행 (NOT_EXECUTED)";
+    case "PLANNED":
+      return "계획됨 (PLANNED)";
+    case "EXECUTED":
+      return "실행됨 (EXECUTED)";
+    default:
+      return status;
+  }
+}
+
+export function translateStepType(stepType: string, lang: Language): string {
+  if (lang !== "ko") return stepType;
+  switch (stepType) {
+    case "PREPARE_DATABASE":
+      return "데이터베이스 준비 (PREPARE_DATABASE)";
+    case "LOAD_BASELINE_SCHEMA":
+      return "기준 스키마 로드 (LOAD_BASELINE_SCHEMA)";
+    case "LOAD_SEED_DATA":
+      return "시드 데이터 적재 (LOAD_SEED_DATA)";
+    case "APPLY_MIGRATION":
+      return "마이그레이션 적용 (APPLY_MIGRATION)";
+    case "RUN_READ_QUERY":
+      return "조회 쿼리 실행 (RUN_READ_QUERY)";
+    case "RUN_WRITE_MUTATION":
+      return "변경 쿼리 실행 (RUN_WRITE_MUTATION)";
+    case "RUN_CONCURRENT_TRANSACTION":
+      return "동시 트랜잭션 실행 (RUN_CONCURRENT_TRANSACTION)";
+    case "CAPTURE_RESULT":
+      return "결과 관측 (CAPTURE_RESULT)";
+    default:
+      return stepType;
+  }
+}
+
+export function translateStepStatus(status: string, lang: Language): string {
+  if (lang !== "ko") return status;
+  switch (status) {
+    case "PASSED":
+      return "성공 (PASSED)";
+    case "FAILED":
+      return "실패 (FAILED)";
+    case "SKIPPED":
+      return "건너뜀 (SKIPPED)";
+    default:
+      return status;
+  }
+}
+
+export function translateStepDescription(description: string, lang: Language): string {
+  if (lang !== "ko") return description;
+  if (/^Provision isolated PostgreSQL/i.test(description)) {
+    return "격리된 PostgreSQL 데이터베이스 인스턴스 프로비저닝";
+  }
+  if (/^Apply pre-PR baseline schema/i.test(description)) {
+    return "PR 이전 기준(Baseline) 스키마 마이그레이션 적용";
+  }
+  if (/^Populate representative seed data/i.test(description)) {
+    return "대표 시드(Seed) 데이터 적재";
+  }
+  if (/^Apply PR migration containing column drop/i.test(description)) {
+    return "컬럼 삭제가 포함된 PR 마이그레이션 적용";
+  }
+  if (/^Apply PR migration/i.test(description)) {
+    return "PR 마이그레이션 적용";
+  }
+  if (/^Execute (?:reference )?query against removed column "([^"]+)"/i.test(description)) {
+    const col = description.match(/"([^"]+)"/)?.[1] ?? "column";
+    return `삭제된 컬럼 "${col}"에 대한 참조 쿼리 실행`;
+  }
+  if (/^Execute (?:reference )?query/i.test(description)) {
+    return "참조 쿼리 실행";
+  }
+  if (/^Capture database response and observe if column reference fails/i.test(description)) {
+    return "데이터베이스 응답 캡처 및 컬럼 참조 실패 관측";
+  }
+  if (/^Capture database response/i.test(description)) {
+    return "데이터베이스 응답 캡처 및 결과 관측";
+  }
+  return description;
+}
+
+export function translateObservation(observation: string, lang: Language): string {
+  if (lang !== "ko") return observation;
+  if (/fail with undefined column error on ([a-zA-Z0-9_.]+)/i.test(observation)) {
+    const target = observation.match(/fail with undefined column error on ([a-zA-Z0-9_.]+)/i)?.[1];
+    return `${target} 컬럼이 존재하지 않아 정의되지 않은 컬럼 오류(undefined_column)로 쿼리 실행 실패 예상`;
+  }
+  if (/fail with undefined column/i.test(observation)) {
+    return "정의되지 않은 컬럼 오류(undefined_column)로 쿼리 실행 실패 예상";
+  }
+  return observation;
+}
+
+export function translateRunSummary(summary: string, lang: Language): string {
+  if (lang !== "ko") return summary;
+  if (
+    /Column is removed by migration and referenced query failed with SQLSTATE 42703/i.test(summary)
+  ) {
+    return "격리된 PostgreSQL에서 장애 재현 성공: 마이그레이션에 의해 컬럼이 삭제되었으며, 참조 쿼리 실행 시 SQLSTATE 42703 (undefined_column: column does not exist) 오류가 발생했습니다.";
+  }
+  if (/Failure reproduced/i.test(summary)) {
+    return "격리된 PostgreSQL에서 장애가 재현되었습니다.";
+  }
+  if (/Verification passed/i.test(summary)) {
+    return "복구 적용 후 검증을 통과했습니다.";
+  }
+  return summary;
+}
+
+export function translateRemediationDescription(desc: string, lang: Language): string {
+  if (lang !== "ko") return desc;
+  if (/Preserve legacy_status during the compatibility window/i.test(desc)) {
+    return "새로운 status 컬럼을 도입하는 호환성 유지 기간 동안 legacy_status 컬럼을 보존하여 구버전 코드 호환성을 유지합니다.";
+  }
+  return desc;
+}
+
+export function translateHypothesisContent(
+  h: {
+    title: string;
+    statement: string;
+    rationale: string;
+    expected_failure_mode: string;
+    assumptions?: string[];
+  },
+  lang: Language,
+): {
+  title: string;
+  statement: string;
+  rationale: string;
+  expected_failure_mode: string;
+  assumptions: string[];
+} {
+  if (lang !== "ko") {
+    return {
+      title: h.title,
+      statement: h.statement,
+      rationale: h.rationale,
+      expected_failure_mode: h.expected_failure_mode,
+      assumptions: h.assumptions ?? [],
+    };
+  }
+
+  let title = h.title;
+  let statement = h.statement;
+  let rationale = h.rationale;
+  let expected_failure_mode = h.expected_failure_mode;
+  const assumptions = (h.assumptions ?? []).map((a) => {
+    if (/application is deployed without/i.test(a)) {
+      return "애플리케이션이 삭제된 컬럼을 반영하지 않은 채 배포됨";
+    }
+    if (/references to .* are meant to be functional/i.test(a)) {
+      return "애플리케이션 내의 모든 해당 컬럼 참조가 정상 동작해야 함";
+    }
+    if (/no alternate code paths handle/i.test(a)) {
+      return "컬럼 누락 시 이를 방어하는 대체 코드 경로가 없음";
+    }
+    return a;
+  });
+
+  if (/dropping (?:the )?([a-zA-Z0-9_.]+) (?:column )?may break/i.test(h.title)) {
+    const col =
+      h.title.match(/dropping (?:the )?([a-zA-Z0-9_.]+) (?:column )?may break/i)?.[1] ??
+      "해당 컬럼";
+    title = `${col} 컬럼 삭제 시 애플리케이션 런타임 장애 발생 가능`;
+  } else if (/dropped column remains referenced/i.test(h.title)) {
+    title = "삭제된 컬럼이 애플리케이션 코드에 여전히 참조되고 있음";
+  }
+
+  if (/application references (?:the )?['"]?([a-zA-Z0-9_.]+)['"]? column/i.test(h.statement)) {
+    const col =
+      h.statement.match(/['"]?([a-zA-Z0-9_.]+)['"]? column/i)?.[1] ?? "컬럼";
+    statement = `애플리케이션 소스 코드에서 '${col}' 컬럼을 참조하고 있어, 마이그레이션으로 컬럼이 삭제된 후 런타임 오류가 발생할 수 있습니다.`;
+  } else if (/application references orders\.legacy_status after migration/i.test(h.statement)) {
+    statement = "마이그레이션 후에도 애플리케이션이 orders.legacy_status를 계속 참조합니다.";
+  }
+
+  if (
+    /application contains qualified references to ['"]?([a-zA-Z0-9_.]+)['"]?/i.test(
+      h.rationale,
+    )
+  ) {
+    const col =
+      h.rationale.match(/qualified references to ['"]?([a-zA-Z0-9_.]+)['"]?/i)?.[1] ??
+      "해당 컬럼";
+    rationale = `애플리케이션에 '${col}'에 대한 직접 참조가 존재하며, 마이그레이션으로 컬럼이 삭제되면 데이터베이스에서 이를 찾을 수 없어 쿼리 실행 실패(Exception)가 발생합니다.`;
+  } else if (/order_service\.py.*references dropped column/i.test(h.rationale)) {
+    rationale =
+      "app/order_service.py에서 삭제된 컬럼을 직접 참조하고 있어 런타임 실패가 발생합니다.";
+  }
+
+  if (
+    /runtime error due to missing column reference/i.test(h.expected_failure_mode) ||
+    /undefinedcolumn/i.test(h.expected_failure_mode)
+  ) {
+    expected_failure_mode =
+      "존재하지 않는 컬럼 참조로 인한 UndefinedColumn 오류 (SQLSTATE 42703)";
+  }
+
+  return { title, statement, rationale, expected_failure_mode, assumptions };
+}

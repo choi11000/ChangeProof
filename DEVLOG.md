@@ -449,13 +449,20 @@ Branch: `feature/public-deployment` (stacked on `feature/submission-hardening`)
   - Set default language to Korean (`ko`) with immediate persistence in `localStorage`.
   - Added `LanguageSwitcher` (`apps/web/src/components/language-switcher.tsx`) to top navigation with active state styling.
   - Implemented lazy state initializer in `I18nProvider` satisfying React 19 / ESLint hooks rules.
-- **Frontend Verification & Live Deployment**:
-  - Vitest: **6/6 tests passing**, verifying both Korean default rendering and English toggle behavior.
-  - ESLint: **Clean (0 warnings, 0 errors)**.
-  - TypeScript: `tsc --noEmit` **Clean**.
-  - Turbopack production build: **Clean**.
-  - Railway public web deployment: Successfully deployed revision `87d4ee11-3da6-45f7-8a74-833103a75593` to `https://changeproof-web-production.up.railway.app`.
-  - Live Browser Acceptance: Verified live with `browser_subagent` (initial Korean load, English switch, return to Korean, demo PR analysis, and PostgreSQL failure reproduction).
+- **Evidence-Grounded AI Reasoning Localization**:
+  - Implemented domain translation helpers (`translateCategory`, `translateTemplate`, `translateStatus`, `translateStepType`, `translateStepStatus`, `translateStepDescription`, `translateObservation`, `translateHypothesisContent`, `translateRunSummary`, `translateRemediationDescription`) in `apps/web/src/lib/i18n.tsx`.
+  - Localized the AI reasoning card:
+    - Title: `legacy_status 컬럼 삭제 시 애플리케이션 런타임 장애 발생 가능`
+    - Category: `스키마 계약 위반 (SCHEMA_CONTRACT_BREAK)`
+    - Statement: `애플리케이션 소스 코드에서 'legacy_status' 컬럼을 참조하고 있어...`
+    - Rationale: `애플리케이션에 'legacy_status'에 대한 직접 참조가 존재하며...`
+    - Expected Failure: `존재하지 않는 컬럼 참조로 인한 UndefinedColumn 오류 (SQLSTATE 42703)`
+    - Experiment Template: `삭제된 컬럼 참조 검증 (DROPPED_COLUMN_REFERENCE)`
+    - Step descriptions and observation expectations translated to natural Korean.
+    - PostgreSQL sandbox step types (`데이터베이스 준비`, `기준 스키마 로드`, `조회 쿼리 실행` 등) and execution summary translated.
+  - Seamless bilingual toggle: toggling to English immediately displays original English prompts/hypotheses; toggling to Korean immediately displays Korean translations without network latency.
+  - Deployed revision `31a668be-c395-41d1-9be2-403800d0e681` to Railway and verified with `browser_subagent`.
+
 
 
 
