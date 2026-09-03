@@ -21,9 +21,11 @@ type DependencyTarget = {
   type: "TABLE" | "COLUMN";
   table: string;
   column?: string | null;
+  change_ids?: string[];
 };
 
 type DependencyEvidence = {
+  id: string;
   target: DependencyTarget;
   path: string;
   line: number;
@@ -49,6 +51,53 @@ type AnalysisWarning = {
   path?: string | null;
 };
 
+type FailureCategory =
+  | "SCHEMA_CONTRACT_BREAK"
+  | "MIGRATION_COMPATIBILITY"
+  | "NULLABILITY_COMPATIBILITY"
+  | "TYPE_COMPATIBILITY"
+  | "TABLE_CONTRACT_BREAK"
+  | "OTHER";
+
+type ExperimentTemplate =
+  | "MIGRATION_APPLY"
+  | "DROPPED_COLUMN_REFERENCE"
+  | "DROPPED_TABLE_REFERENCE"
+  | "NOT_NULL_COMPATIBILITY"
+  | "ALTER_TYPE_COMPATIBILITY";
+
+type FailureHypothesis = {
+  id: string;
+  category: FailureCategory;
+  title: string;
+  statement: string;
+  change_ids: string[];
+  evidence_ids: string[];
+  rationale: string;
+  expected_failure_mode: string;
+  assumptions: string[];
+  experiment_template: ExperimentTemplate;
+  status: "UNVERIFIED" | "PROPOSED";
+};
+
+type ExperimentStep = {
+  order: number;
+  type: string;
+  description: string;
+  sql?: string | null;
+};
+
+type ExperimentPlan = {
+  id: string;
+  hypothesis_id: string;
+  template: ExperimentTemplate;
+  change_ids: string[];
+  evidence_ids: string[];
+  steps: ExperimentStep[];
+  expected_observation: string;
+  status: "NOT_EXECUTED" | "PLANNED";
+};
+
 type AnalysisResult = {
   pull_request: { number: number; title: string; changed_files: number; html_url: string };
   changed_files: Array<{
@@ -66,6 +115,8 @@ type AnalysisResult = {
   dependency_targets: DependencyTarget[];
   dependency_evidence: DependencyEvidence[];
   impact_summary: ImpactSummary | null;
+  failure_hypotheses?: FailureHypothesis[];
+  experiment_plans?: ExperimentPlan[];
   warnings: AnalysisWarning[];
 };
 
@@ -244,7 +295,7 @@ export function AnalysisForm() {
 
             {result.dependency_evidence && result.dependency_evidence.length > 0 ? (
               <div className="evidence-list">
-                {result.dependency_evidence.map((evidence, idx) => {
+                {result.dependency_evidence.map((evidence) => {
                   const matchMeta = matchKindLabel(evidence.match_kind);
                   const targetLabel = [
                     evidence.target.table,
@@ -254,7 +305,7 @@ export function AnalysisForm() {
                     .join(".");
 
                   return (
-                    <article key={`${evidence.path}-${evidence.line}-${idx}`} className="evidence-card">
+                    <article key={evidence.id} className="evidence-card">
                       <div className="evidence-meta">
                         <div className="evidence-path">
                           <strong>{evidence.path}</strong>:{evidence.line}
@@ -281,6 +332,77 @@ export function AnalysisForm() {
                 {result.impact_summary?.scan_complete
                   ? "No source references found in scanned application files."
                   : "No references found in scanned subset. Source analysis was limited."}
+              </div>
+            )}
+          </div>
+
+          <hr className="section-divider" />
+
+          {/* Failure Hypotheses & Executable Experiment Planning */}
+          <div className="evidence-section" aria-label="Failure Hypotheses">
+            <div className="evidence-heading">
+              <div>
+                <p className="eyebrow">FAILURE HYPOTHESES &amp; EXPERIMENT PLANNING</p>
+                <h3>Evidence-Grounded AI Reasoning</h3>
+              </div>
+              <span className="badge badge-unverified">NOT EXECUTED YET</span>
+            </div>
+
+            {result.failure_hypotheses && result.failure_hypotheses.length > 0 ? (
+              <div className="hypothesis-list">
+                {result.failure_hypotheses.map((hypothesis) => {
+                  const matchingPlan = result.experiment_plans?.find(
+                    (p) => p.hypothesis_id === hypothesis.id,
+                  );
+
+                  return (
+                    <article key={hypothesis.id} className="hypothesis-card">
+                      <div className="hypothesis-header">
+                        <span className="badge badge-hypothesis">HYPOTHESIS • {hypothesis.status}</span>
+                        <span className="hypothesis-category">{hypothesis.category}</span>
+                      </div>
+                      <h4>{hypothesis.title}</h4>
+                      <p className="hypothesis-statement">{hypothesis.statement}</p>
+                      <div className="hypothesis-meta">
+                        <div>
+                          <strong>Rationale:</strong> {hypothesis.rationale}
+                        </div>
+                        <div>
+                          <strong>Expected Failure:</strong> <code>{hypothesis.expected_failure_mode}</code>
+                        </div>
+                      </div>
+
+                      {matchingPlan && (
+                        <div className="plan-card">
+                          <div className="plan-header">
+                            <div>
+                              <span className="badge badge-plan">
+                                PROPOSED EXPERIMENT • {matchingPlan.status}
+                              </span>
+                              <h5>Template: {matchingPlan.template}</h5>
+                            </div>
+                            <span className="plan-status-notice">Not executed yet</span>
+                          </div>
+                          <p className="plan-observation">
+                            <strong>Expected observation:</strong> {matchingPlan.expected_observation}
+                          </p>
+                          <ol className="plan-steps">
+                            {matchingPlan.steps.map((step) => (
+                              <li key={step.order}>
+                                <span className="step-desc">{step.description}</span>
+                                {step.sql && <code className="step-sql">{step.sql}</code>}
+                              </li>
+                            ))}
+                          </ol>
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="empty-state">
+                No evidence-grounded failure hypothesis generated for this change.
               </div>
             )}
           </div>

@@ -66,5 +66,29 @@ h2 { font-size: clamp(30px, 4vw, 50px); margin: 12px 0 0; letter-spacing: -.05em
 .evidence-excerpt { margin: 8px 0 0; padding: 10px 14px; background: #060807; border-left: 3px solid var(--acid); border-radius: 4px; font: 12px monospace; color: #d1d5db; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
 .empty-state { padding: 24px; text-align: center; color: var(--muted); font: 13px monospace; border: 1px dashed #2a352c; border-radius: 8px; }
 
+.badge-unverified { background: rgba(245, 158, 11, .15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, .3); }
+.badge-hypothesis { background: rgba(14, 165, 233, .15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, .3); }
+.badge-plan { background: rgba(168, 85, 247, .15); color: #c084fc; border: 1px solid rgba(192, 132, 252, .3); }
+
+.hypothesis-list { display: grid; gap: 16px; }
+.hypothesis-card { padding: 20px; background: #0b0f0c; border: 1px solid #2a352c; border-radius: 8px; }
+.hypothesis-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.hypothesis-category { font: 600 12px monospace; color: var(--muted); text-transform: uppercase; }
+.hypothesis-card h4 { font-size: 16px; margin: 0 0 8px; color: #fff; font-weight: 600; }
+.hypothesis-statement { font-size: 14px; color: #d1d5db; line-height: 1.5; margin: 0 0 12px; }
+.hypothesis-meta { display: grid; gap: 6px; font-size: 13px; color: var(--muted); padding: 10px 14px; background: #060807; border-radius: 6px; margin-bottom: 16px; }
+.hypothesis-meta strong { color: #fff; }
+.hypothesis-meta code { color: #f87171; background: rgba(239, 68, 68, .1); padding: 2px 6px; border-radius: 4px; }
+
+.plan-card { padding: 16px; background: #060807; border: 1px solid #1f2821; border-radius: 6px; margin-top: 12px; }
+.plan-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.plan-header h5 { font-size: 14px; color: #c084fc; margin: 4px 0 0; font-family: monospace; }
+.plan-status-notice { font: italic 12px sans-serif; color: #9ca3af; }
+.plan-observation { font-size: 13px; color: #9ca3af; margin: 0 0 12px; line-height: 1.4; }
+.plan-observation strong { color: #e5e7eb; }
+.plan-steps { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: 13px; color: #d1d5db; }
+.step-desc { font-weight: 500; }
+.step-sql { display: block; margin-top: 4px; padding: 6px 10px; background: #000; border-left: 2px solid var(--acid); font: 12px monospace; color: var(--acid); border-radius: 3px; word-break: break-all; }
+
 @media (max-width: 760px) { .hero { padding-top: 72px; } .analysis-card { grid-template-columns: 1fr; } .wide { grid-column: auto; } button { width: 100%; } .pipeline, .result-counts { grid-template-columns: 1fr 1fr; } .proof { align-items: flex-start; flex-direction: column; } .principle-card { width: 100%; } }
 
