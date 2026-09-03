@@ -124,21 +124,16 @@ class OpenAIHypothesisClient:
         start_time = time.monotonic()
 
         try:
-            completion = await self._client.beta.chat.completions.parse(
+            response = await self._client.responses.parse(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {
-                        "role": "user",
-                        "content": (
-                            "Analyze the following change facts and dependency evidence. "
-                            "Propose grounded failure hypotheses if evidence suggests "
-                            "potential failure:\n\n"
-                            f"{user_content}"
-                        ),
-                    },
-                ],
-                response_format=HypothesisProposalResult,
+                instructions=SYSTEM_PROMPT,
+                input=(
+                    "Analyze the following change facts and dependency evidence. "
+                    "Propose grounded failure hypotheses if evidence suggests "
+                    "potential failure:\n\n"
+                    f"{user_content}"
+                ),
+                text_format=HypothesisProposalResult,
             )
         except AuthenticationError as exc:
             raise OpenAIAuthError(f"OpenAI authentication failed: {exc}") from exc
@@ -152,21 +147,17 @@ class OpenAIHypothesisClient:
             raise OpenAIResponseError(f"Unexpected error parsing OpenAI response: {exc}") from exc
 
         duration = time.monotonic() - start_time
-        message = completion.choices[0].message
+        parsed = response.output_parsed
 
-        if message.refusal:
+        if parsed is None:
             logger.warning(
-                "OpenAI model refused request",
-                extra={"model": self.model, "refusal": message.refusal, "duration": duration},
+                "OpenAI response contained no parsed output or was refused",
+                extra={"model": self.model, "duration": duration},
             )
             return HypothesisProposalResult(hypotheses=[])
 
-        parsed = message.parsed
-        if parsed is None:
-            raise OpenAIResponseError("OpenAI returned null structured output")
-
         logger.info(
-            "Generated failure hypotheses from OpenAI",
+            "Generated failure hypotheses from OpenAI Responses API",
             extra={
                 "model": self.model,
                 "hypothesis_count": len(parsed.hypotheses),

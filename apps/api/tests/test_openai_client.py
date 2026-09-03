@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 import httpx
 import pytest
 from openai import (
+    APIConnectionError,
     APITimeoutError,
     AuthenticationError,
     RateLimitError,
@@ -43,8 +44,8 @@ def test_unconfigured_client_raises_auth_error() -> None:
 
 def test_openai_auth_error_mapping() -> None:
     mock_openai = MagicMock()
-    request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
-    mock_openai.beta.chat.completions.parse = AsyncMock(
+    request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+    mock_openai.responses.parse = AsyncMock(
         side_effect=AuthenticationError(
             message="Incorrect API key",
             response=httpx.Response(401, request=request),
@@ -61,8 +62,8 @@ def test_openai_auth_error_mapping() -> None:
 
 def test_openai_rate_limit_mapping() -> None:
     mock_openai = MagicMock()
-    request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
-    mock_openai.beta.chat.completions.parse = AsyncMock(
+    request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+    mock_openai.responses.parse = AsyncMock(
         side_effect=RateLimitError(
             message="Rate limit reached",
             response=httpx.Response(429, request=request),
@@ -78,9 +79,22 @@ def test_openai_rate_limit_mapping() -> None:
 
 def test_openai_timeout_mapping() -> None:
     mock_openai = MagicMock()
-    request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
-    mock_openai.beta.chat.completions.parse = AsyncMock(
+    request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+    mock_openai.responses.parse = AsyncMock(
         side_effect=APITimeoutError(request=request)
+    )
+
+    client = OpenAIHypothesisClient(client=mock_openai)
+
+    with pytest.raises(OpenAITimeoutError, match="network/timeout"):
+        asyncio.run(client.generate(_sample_context()))
+
+
+def test_openai_connection_error_mapping() -> None:
+    mock_openai = MagicMock()
+    request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+    mock_openai.responses.parse = AsyncMock(
+        side_effect=APIConnectionError(request=request)
     )
 
     client = OpenAIHypothesisClient(client=mock_openai)
@@ -91,9 +105,6 @@ def test_openai_timeout_mapping() -> None:
 
 def test_openai_successful_structured_output() -> None:
     mock_openai = MagicMock()
-    mock_choice = MagicMock()
-    mock_message = MagicMock()
-    mock_message.refusal = None
     expected_result = HypothesisProposalResult(
         hypotheses=[
             FailureHypothesis(
@@ -111,13 +122,9 @@ def test_openai_successful_structured_output() -> None:
             )
         ]
     )
-    mock_message.parsed = expected_result
-    mock_choice.message = mock_message
-
-    mock_completion = MagicMock()
-    mock_completion.choices = [mock_choice]
-
-    mock_openai.beta.chat.completions.parse = AsyncMock(return_value=mock_completion)
+    mock_response = MagicMock()
+    mock_response.output_parsed = expected_result
+    mock_openai.responses.parse = AsyncMock(return_value=mock_response)
 
     client = OpenAIHypothesisClient(client=mock_openai)
     result = asyncio.run(client.generate(_sample_context()))
@@ -126,16 +133,11 @@ def test_openai_successful_structured_output() -> None:
     assert result.hypotheses[0].id == "hyp_001"
 
 
-def test_openai_model_refusal_returns_empty_list() -> None:
+def test_openai_model_refusal_or_empty_returns_empty_list() -> None:
     mock_openai = MagicMock()
-    mock_choice = MagicMock()
-    mock_message = MagicMock()
-    mock_message.refusal = "I cannot fulfill this request."
-    mock_choice.message = mock_message
-    mock_completion = MagicMock()
-    mock_completion.choices = [mock_choice]
-
-    mock_openai.beta.chat.completions.parse = AsyncMock(return_value=mock_completion)
+    mock_response = MagicMock()
+    mock_response.output_parsed = None
+    mock_openai.responses.parse = AsyncMock(return_value=mock_response)
 
     client = OpenAIHypothesisClient(client=mock_openai)
     result = asyncio.run(client.generate(_sample_context()))
