@@ -26,7 +26,8 @@ def test_api_execute_experiment_success() -> None:
     mock_run = ExperimentRun(
         id="run_abc123",
         experiment_plan_id="plan_test_01",
-        plan_digest="a1b2c3d4e5f67890",
+        experiment_contract_digest="contract_abc123",
+        subject_digest="subject_def456",
         template=ExperimentTemplate.DROPPED_COLUMN_REFERENCE,
         verdict=ExperimentVerdict.PROVEN_FAIL,
         started_at=now,
@@ -63,7 +64,8 @@ def test_api_execute_experiment_success() -> None:
         assert resp.status_code == 200
         data = resp.json()
         assert data["run"]["verdict"] == "PROVEN_FAIL"
-        assert data["run"]["plan_digest"] == "a1b2c3d4e5f67890"
+        assert data["run"]["experiment_contract_digest"] == "contract_abc123"
+        assert data["run"]["subject_digest"] == "subject_def456"
         assert len(data["run"]["step_results"]) == 2
     finally:
         app.dependency_overrides.clear()
@@ -83,3 +85,11 @@ def test_api_execute_experiment_unknown_fixture_returns_400() -> None:
         assert "Unknown fixture" in resp.json()["detail"]
     finally:
         app.dependency_overrides.clear()
+
+
+def test_api_rejects_client_controlled_digest() -> None:
+    response = client.post(
+        "/api/v1/experiments/execute",
+        json={"fixture_id": "risky-saas/drop-legacy-status", "plan_digest": "forged"},
+    )
+    assert response.status_code == 422

@@ -268,6 +268,29 @@ Commits:
 - `c8cf57d fix: forward AI credentials into API container`
 - `7c7623a refactor: align OpenAI hypothesis client with Responses API`
 
+## 2026-09-03 — Phase 6.1 Runtime Proof & Integrity Hardening
+
+### Added
+
+- Server-owned canonical `experiment_contract_digest` and `subject_digest` identities
+- Strict request validation rejecting client-supplied digest fields
+- Exact SQLSTATE-only failure attribution and incomplete-step safeguards
+- Cleanup observability independent of the PostgreSQL hypothesis verdict
+
+### Tests
+
+- API: `pytest` PASS (139 passed, 5 sandbox tests skipped, 95.25% coverage)
+- API: Ruff and Python bytecode compilation PASS
+- Web: ESLint, TypeScript, Vitest, production build, and npm audit PASS
+- Real PostgreSQL acceptance: BLOCKED because Docker is unavailable on this host
+
+### Status
+
+- Execution implementation: **COMPLETE**
+- Runtime PostgreSQL acceptance: **BLOCKED**
+- Evidence implementation: **COMPLETE**
+- Runtime evidence proof: **NOT VERIFIED**
+
 
 
 

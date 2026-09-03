@@ -178,3 +178,60 @@ def test_verify_setup_failure_is_inconclusive() -> None:
     verdict, summary = verifier.evaluate(ExperimentTemplate.DROPPED_COLUMN_REFERENCE, steps)
     assert verdict is ExperimentVerdict.INCONCLUSIVE
     assert "setup failure" in summary.lower()
+
+
+def _complete_steps_with_query_failure(
+    *, sql_state: str | None, message: str
+) -> list[ExperimentStepResult]:
+    return [
+        _step(1, ExperimentStepType.PREPARE_DATABASE, ExperimentStepStatus.PASSED),
+        _step(2, ExperimentStepType.LOAD_BASELINE_SCHEMA, ExperimentStepStatus.PASSED),
+        _step(3, ExperimentStepType.LOAD_SEED_DATA, ExperimentStepStatus.PASSED),
+        _step(4, ExperimentStepType.APPLY_MIGRATION, ExperimentStepStatus.PASSED),
+        _step(
+            5,
+            ExperimentStepType.RUN_READ_QUERY,
+            ExperimentStepStatus.FAILED,
+            sql_state=sql_state,
+            message=message,
+        ),
+        _step(6, ExperimentStepType.CAPTURE_RESULT, ExperimentStepStatus.PASSED),
+    ]
+
+
+def test_wrong_sqlstate_is_inconclusive_even_when_message_matches() -> None:
+    steps = _complete_steps_with_query_failure(
+        sql_state="42601", message='column "legacy_status" does not exist'
+    )
+    verdict, _ = ExperimentVerifier().evaluate(
+        ExperimentTemplate.DROPPED_COLUMN_REFERENCE, steps
+    )
+    assert verdict is ExperimentVerdict.INCONCLUSIVE
+
+
+def test_message_text_without_sqlstate_cannot_prove_failure() -> None:
+    steps = _complete_steps_with_query_failure(
+        sql_state=None, message='column "legacy_status" does not exist'
+    )
+    verdict, _ = ExperimentVerifier().evaluate(
+        ExperimentTemplate.DROPPED_COLUMN_REFERENCE, steps
+    )
+    assert verdict is ExperimentVerdict.INCONCLUSIVE
+
+
+def test_migration_apply_verification_failure_is_not_proven_pass() -> None:
+    steps = _complete_steps_with_query_failure(sql_state="XX000", message="query failed")
+    verdict, _ = ExperimentVerifier().evaluate(ExperimentTemplate.MIGRATION_APPLY, steps)
+    assert verdict is ExperimentVerdict.INCONCLUSIVE
+
+
+def test_missing_required_step_is_inconclusive() -> None:
+    steps = [
+        _step(1, ExperimentStepType.PREPARE_DATABASE, ExperimentStepStatus.PASSED),
+        _step(2, ExperimentStepType.LOAD_BASELINE_SCHEMA, ExperimentStepStatus.PASSED),
+        _step(3, ExperimentStepType.LOAD_SEED_DATA, ExperimentStepStatus.PASSED),
+        _step(4, ExperimentStepType.APPLY_MIGRATION, ExperimentStepStatus.PASSED),
+        _step(5, ExperimentStepType.RUN_READ_QUERY, ExperimentStepStatus.PASSED),
+    ]
+    verdict, _ = ExperimentVerifier().evaluate(ExperimentTemplate.MIGRATION_APPLY, steps)
+    assert verdict is ExperimentVerdict.INCONCLUSIVE

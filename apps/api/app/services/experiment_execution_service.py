@@ -1,11 +1,13 @@
-import hashlib
 import logging
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
 from app.analyzers.experiment_verifier import ExperimentVerifier
-from app.executors.postgres_experiment import PostgresExperimentExecutor
+from app.executors.postgres_experiment import (
+    FixtureExecutionResult,
+    PostgresExperimentExecutor,
+)
 from app.fixtures.experiment_registry import (
     get_controlled_fixture,
     get_repo_root,
@@ -13,6 +15,10 @@ from app.fixtures.experiment_registry import (
 from app.schemas.execution import (
     ExecuteExperimentRequest,
     ExperimentRun,
+)
+from app.schemas.experiment_identity import (
+    compute_experiment_contract_digest,
+    compute_subject_digest,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,31 +53,38 @@ class ExperimentExecutionService:
             )
 
         started_at = datetime.now(UTC)
-        step_results = self.executor.execute_fixture(fixture, repo_root=self.repo_root)
+        execution = self.executor.execute_fixture(fixture, repo_root=self.repo_root)
+        if isinstance(execution, list):
+            execution = FixtureExecutionResult(execution, None)
         finished_at = datetime.now(UTC)
 
         verdict, summary = self.verifier.evaluate(
             fixture.template,
-            step_results,
+            execution.step_results,
             expected_sqlstate=fixture.expected_sqlstate,
         )
 
         plan_id = request.experiment_plan_id or f"plan_{fixture.id.replace('/', '_')}"
-        raw_digest = f"{fixture.id}:{fixture.template}:{fixture.target}"
-        plan_digest = (
-            request.plan_digest
-            or hashlib.sha256(raw_digest.encode("utf-8")).hexdigest()[:16]
+        baseline_schema = fixture.read_baseline_schema(self.repo_root)
+        seed_data = fixture.read_seed_data(self.repo_root)
+        migration = fixture.read_migration(self.repo_root)
+        contract_digest = compute_experiment_contract_digest(
+            fixture,
+            baseline_schema=baseline_schema,
+            seed_data=seed_data,
         )
 
         run = ExperimentRun(
             id=f"run_{uuid.uuid4().hex[:12]}",
             experiment_plan_id=plan_id,
-            plan_digest=plan_digest,
+            experiment_contract_digest=contract_digest,
+            subject_digest=compute_subject_digest(migration, variant="original"),
             template=fixture.template,
             verdict=verdict,
             started_at=started_at,
             finished_at=finished_at,
-            step_results=step_results,
+            step_results=execution.step_results,
+            cleanup_succeeded=execution.cleanup_succeeded,
             summary=summary,
         )
 

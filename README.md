@@ -77,6 +77,6 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for native setup, tests, and project conven
 | 3 — GitHub PR intake | Complete on stacked `feature/github-pr-intake`; not merged to `main` |
 | 4 — Dependency discovery | Complete on stacked `feature/dependency-discovery`; not merged to `main` |
 | 5 — Failure hypothesis & experiment planning | Complete on stacked `feature/failure-experiment-planning`; not merged to `main` |
-| 6 — Ephemeral PostgreSQL experiment execution | Complete on stacked `feature/postgres-experiment-execution`; not merged to `main` |
+| 6 — Ephemeral PostgreSQL experiment execution | Implementation complete on stacked `feature/postgres-experiment-execution`; real PostgreSQL acceptance blocked because Docker is unavailable on the development host |
 
 See [DEVLOG.md](DEVLOG.md) for verified results and branch dependencies.

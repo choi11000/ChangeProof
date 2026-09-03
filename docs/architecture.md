@@ -10,8 +10,8 @@ ChangeProof never converts an LLM opinion directly into a verdict. Facts come fr
 3. Dependency Discovery      Application <-> schema                COMPLETE
 4. Failure Hypothesis        Evidence-grounded AI reasoning        COMPLETE
 5. Experiment Planning       Deterministic ExperimentCompiler      COMPLETE
-6. Execution                 Ephemeral PostgreSQL                  COMPLETE
-7. Evidence                  Observed SQLSTATE results             COMPLETE
+6. Execution                 Ephemeral PostgreSQL                  IMPLEMENTED; RUNTIME BLOCKED
+7. Evidence                  Observed SQLSTATE results             IMPLEMENTED; RUNTIME BLOCKED
 8. Remediation               Deterministic schema fix              NEXT
 9. Re-execution              Same experiment
 10. Proof
@@ -34,6 +34,9 @@ The product promise is not merely to predict failure:
 - `analyzers/dependency.py`: deterministic target extraction, reference matching, and impact summary.
 - `analyzers/experiment_compiler.py`: deterministic compiler generating executable, read-oriented experiment plans.
 - `analyzers/experiment_verifier.py`: deterministic verifier attributing PostgreSQL observations to `PROVEN_FAIL` / `PROVEN_PASS` / `INCONCLUSIVE` / `EXECUTION_ERROR`.
+- `schemas/experiment_identity.py`: canonical, server-owned SHA-256 identities separating the stable experiment contract from the executed migration subject.
+
+Execution requests cannot provide proof digests. The server hashes sorted, compact UTF-8 JSON over baseline schema, seed data, target, template, verification SQL, and verifier contract version for `experiment_contract_digest`; migration content and candidate variant form `subject_digest`. Verdict attribution requires exact SQLSTATE equality, while database cleanup status is recorded separately from the hypothesis verdict.
 - `executors/postgres_experiment.py`: ephemeral schema isolation (`cp_run_<hex12>`), statement/lock timeouts, and secret-redacted execution runner.
 - `fixtures/experiment_registry.py`: server-controlled registry of synthetic demo fixtures.
 - `postgres`: persistent product data such as analyses, steps, and evidence.

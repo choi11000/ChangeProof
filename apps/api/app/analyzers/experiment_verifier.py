@@ -5,9 +5,23 @@ from app.schemas.execution import (
 )
 from app.schemas.experiment import ExperimentStepType, ExperimentTemplate
 
+EXPECTED_SQLSTATES = {
+    ExperimentTemplate.DROPPED_COLUMN_REFERENCE: "42703",
+    ExperimentTemplate.DROPPED_TABLE_REFERENCE: "42P01",
+    ExperimentTemplate.NOT_NULL_COMPATIBILITY: "23502",
+    ExperimentTemplate.ALTER_TYPE_COMPATIBILITY: "22001",
+}
+
+FAILURE_STEPS = {
+    ExperimentTemplate.DROPPED_COLUMN_REFERENCE: ExperimentStepType.RUN_READ_QUERY,
+    ExperimentTemplate.DROPPED_TABLE_REFERENCE: ExperimentStepType.RUN_READ_QUERY,
+    ExperimentTemplate.NOT_NULL_COMPATIBILITY: ExperimentStepType.APPLY_MIGRATION,
+    ExperimentTemplate.ALTER_TYPE_COMPATIBILITY: ExperimentStepType.APPLY_MIGRATION,
+}
+
 
 class ExperimentVerifier:
-    """Deterministic verifier attributing PostgreSQL observations to experiment verdicts."""
+    """Attribute verdicts only to complete, typed PostgreSQL observations."""
 
     def evaluate(
         self,
@@ -17,8 +31,6 @@ class ExperimentVerifier:
         expected_sqlstate: str | None = None,
     ) -> tuple[ExperimentVerdict, str]:
         step_map = {step.type: step for step in step_results}
-
-        # 1. Check for infrastructure failures
         prep = step_map.get(ExperimentStepType.PREPARE_DATABASE)
         if prep and prep.status is ExperimentStepStatus.FAILED:
             return (
@@ -26,137 +38,74 @@ class ExperimentVerifier:
                 f"Database infrastructure failure: Unable to prepare sandbox ({prep.message}).",
             )
 
-        # 2. Check for setup failures (Baseline schema or Seed data)
-        baseline = step_map.get(ExperimentStepType.LOAD_BASELINE_SCHEMA)
-        if baseline and baseline.status is ExperimentStepStatus.FAILED:
-            return (
-                ExperimentVerdict.INCONCLUSIVE,
-                f"Setup failure during baseline schema initialization: {baseline.message}",
-            )
-
-        seed = step_map.get(ExperimentStepType.LOAD_SEED_DATA)
-        if seed and seed.status is ExperimentStepStatus.FAILED:
-            return (
-                ExperimentVerdict.INCONCLUSIVE,
-                f"Setup failure during seed data insertion: {seed.message}",
-            )
-
-        migration = step_map.get(ExperimentStepType.APPLY_MIGRATION)
-        read_query = step_map.get(ExperimentStepType.RUN_READ_QUERY)
-
-        # 3. Attribute verdict based on template
-        if template is ExperimentTemplate.DROPPED_COLUMN_REFERENCE:
-            if migration and migration.status is ExperimentStepStatus.PASSED:
-                if read_query and read_query.status is ExperimentStepStatus.FAILED:
-                    msg = (read_query.message or "").lower()
-                    if read_query.sql_state == "42703" or "does not exist" in msg:
-                        return (
-                            ExperimentVerdict.PROVEN_FAIL,
-                            "Failure reproduced in isolated PostgreSQL: Column is removed by "
-                            "migration and referenced query failed with SQLSTATE 42703 "
-                            "(undefined_column).",
-                        )
-                    return (
-                        ExperimentVerdict.INCONCLUSIVE,
-                        f"Query failed with unexpected SQLSTATE {read_query.sql_state}: "
-                        f"{read_query.message}",
-                    )
-                if read_query and read_query.status is ExperimentStepStatus.PASSED:
-                    return (
-                        ExperimentVerdict.PROVEN_PASS,
-                        "Failure not reproduced: Query executed successfully without expected "
-                        "column contract violation.",
-                    )
-            msg = migration.message if migration else "No migration step"
-            return (
-                ExperimentVerdict.INCONCLUSIVE,
-                f"Migration did not pass cleanly: {msg}",
-            )
-
-        if template is ExperimentTemplate.DROPPED_TABLE_REFERENCE:
-            if migration and migration.status is ExperimentStepStatus.PASSED:
-                if read_query and read_query.status is ExperimentStepStatus.FAILED:
-                    msg = (read_query.message or "").lower()
-                    if read_query.sql_state == "42P01" or "does not exist" in msg:
-                        return (
-                            ExperimentVerdict.PROVEN_FAIL,
-                            "Failure reproduced in isolated PostgreSQL: Table is removed by "
-                            "migration and query failed with SQLSTATE 42P01 (undefined_table).",
-                        )
-                    return (
-                        ExperimentVerdict.INCONCLUSIVE,
-                        f"Query failed with unexpected SQLSTATE {read_query.sql_state}: "
-                        f"{read_query.message}",
-                    )
-                if read_query and read_query.status is ExperimentStepStatus.PASSED:
-                    return (
-                        ExperimentVerdict.PROVEN_PASS,
-                        "Failure not reproduced: Table remained accessible after migration.",
-                    )
-            msg = migration.message if migration else "No migration step"
-            return (
-                ExperimentVerdict.INCONCLUSIVE,
-                f"Migration did not pass cleanly: {msg}",
-            )
-
-        if template is ExperimentTemplate.NOT_NULL_COMPATIBILITY:
-            if migration and migration.status is ExperimentStepStatus.FAILED:
-                msg = (migration.message or "").lower()
-                if migration.sql_state == "23502" or "null" in msg:
-                    return (
-                        ExperimentVerdict.PROVEN_FAIL,
-                        "Failure reproduced in isolated PostgreSQL: Migration failed with "
-                        "SQLSTATE 23502 (not_null_violation) due to existing NULL rows in "
-                        "baseline seed.",
-                    )
+        for step_type, label in (
+            (ExperimentStepType.LOAD_BASELINE_SCHEMA, "baseline schema initialization"),
+            (ExperimentStepType.LOAD_SEED_DATA, "seed data insertion"),
+        ):
+            step = step_map.get(step_type)
+            if step and step.status is ExperimentStepStatus.FAILED:
                 return (
                     ExperimentVerdict.INCONCLUSIVE,
-                    f"Migration failed with unexpected SQLSTATE {migration.sql_state}: "
-                    f"{migration.message}",
-                )
-            if migration and migration.status is ExperimentStepStatus.PASSED:
-                return (
-                    ExperimentVerdict.PROVEN_PASS,
-                    "Failure not reproduced: NOT NULL constraint applied without conflicting "
-                    "null values.",
+                    f"Setup failure during {label}: {step.message}",
                 )
 
-        if template is ExperimentTemplate.ALTER_TYPE_COMPATIBILITY:
-            if migration and migration.status is ExperimentStepStatus.FAILED:
-                msg = (migration.message or "").lower()
-                if migration.sql_state == "22001" or "too long" in msg or "truncat" in msg:
-                    return (
-                        ExperimentVerdict.PROVEN_FAIL,
-                        "Failure reproduced in isolated PostgreSQL: Migration failed with "
-                        "SQLSTATE 22001 (string_data_right_truncation) due to existing data "
-                        "exceeding new type length.",
-                    )
-                return (
-                    ExperimentVerdict.INCONCLUSIVE,
-                    f"Migration failed with unexpected SQLSTATE {migration.sql_state}: "
-                    f"{migration.message}",
-                )
-            if migration and migration.status is ExperimentStepStatus.PASSED:
-                return (
-                    ExperimentVerdict.PROVEN_PASS,
-                    "Failure not reproduced: Column type alteration succeeded.",
-                )
+        required = set(ExperimentStepType)
+        missing = required.difference(step_map)
+        if missing:
+            labels = ", ".join(sorted(step.value for step in missing))
+            return (
+                ExperimentVerdict.INCONCLUSIVE,
+                f"Experiment outcome inconclusive: Missing required steps: {labels}.",
+            )
 
         if template is ExperimentTemplate.MIGRATION_APPLY:
-            if migration and migration.status is ExperimentStepStatus.PASSED:
+            if all(step_map[item].status is ExperimentStepStatus.PASSED for item in required):
                 return (
                     ExperimentVerdict.PROVEN_PASS,
-                    "Safe migration verified: DDL applied cleanly and database checks "
+                    "Safe migration verified: DDL applied cleanly and every database check "
                     "succeeded in isolated sandbox.",
                 )
-            if migration and migration.status is ExperimentStepStatus.FAILED:
+            return (
+                ExperimentVerdict.INCONCLUSIVE,
+                "Safe migration verification did not complete every required step successfully.",
+            )
+
+        failure_step_type = FAILURE_STEPS.get(template)
+        canonical_sqlstate = EXPECTED_SQLSTATES.get(template)
+        if failure_step_type is None or canonical_sqlstate is None:
+            return (
+                ExperimentVerdict.INCONCLUSIVE,
+                "Experiment outcome inconclusive: No deterministic verifier contract exists.",
+            )
+        if expected_sqlstate is not None and expected_sqlstate != canonical_sqlstate:
+            return (
+                ExperimentVerdict.INCONCLUSIVE,
+                "Experiment outcome inconclusive: Fixture SQLSTATE contract does not match "
+                "the verifier contract.",
+            )
+
+        observation = step_map[failure_step_type]
+        if observation.status is ExperimentStepStatus.FAILED:
+            if observation.sql_state == canonical_sqlstate:
                 return (
                     ExperimentVerdict.PROVEN_FAIL,
-                    f"Migration failed to apply with SQLSTATE {migration.sql_state}: "
-                    f"{migration.message}",
+                    "Failure reproduced in isolated PostgreSQL with expected SQLSTATE "
+                    f"{canonical_sqlstate} for {template.value}.",
                 )
+            return (
+                ExperimentVerdict.INCONCLUSIVE,
+                f"Observed failure had unexpected SQLSTATE {observation.sql_state}; expected "
+                f"{canonical_sqlstate}. Message text is evidence only: {observation.message}",
+            )
+
+        if all(step_map[item].status is ExperimentStepStatus.PASSED for item in required):
+            return (
+                ExperimentVerdict.PROVEN_PASS,
+                "Failure not reproduced: Every required step and the verification query "
+                "completed successfully.",
+            )
 
         return (
             ExperimentVerdict.INCONCLUSIVE,
-            "Experiment outcome inconclusive: Observed results did not match expected criteria.",
+            "Experiment outcome inconclusive: Required observations did not complete.",
         )

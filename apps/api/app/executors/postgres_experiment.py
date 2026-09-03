@@ -2,7 +2,8 @@ import logging
 import re
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from pathlib import Path
 
 import psycopg
@@ -24,6 +25,23 @@ class PostgresExperimentExecutorError(Exception):
     """Raised when an infrastructure error prevents execution."""
 
     pass
+
+
+@dataclass
+class FixtureExecutionResult:
+    step_results: list[ExperimentStepResult]
+    cleanup_succeeded: bool | None
+
+    def __iter__(self) -> Iterator[ExperimentStepResult]:
+        return iter(self.step_results)
+
+    def __len__(self) -> int:
+        return len(self.step_results)
+
+    def __getitem__(
+        self, index: int | slice
+    ) -> ExperimentStepResult | list[ExperimentStepResult]:
+        return self.step_results[index]
 
 
 class PostgresExperimentExecutor:
@@ -49,13 +67,17 @@ class PostgresExperimentExecutor:
         fixture: ControlledExperimentFixture,
         *,
         repo_root: Path | None = None,
-    ) -> list[ExperimentStepResult]:
+    ) -> FixtureExecutionResult:
         root = repo_root or get_repo_root()
         schema_name = f"cp_run_{uuid.uuid4().hex[:12]}"
         if not SCHEMA_REGEX.match(schema_name):
             raise PostgresExperimentExecutorError(f"Invalid schema name: {schema_name}")
 
         step_results: list[ExperimentStepResult] = []
+        execution_result = FixtureExecutionResult(
+            step_results=step_results,
+            cleanup_succeeded=None,
+        )
         conn: psycopg.Connection | None = None
 
         # 1. PREPARE_DATABASE
@@ -113,7 +135,7 @@ class PostgresExperimentExecutor:
                         message=f"Skipped: {desc} (database preparation failed)",
                     )
                 )
-            return step_results
+            return execution_result
 
         try:
             # 2. LOAD_BASELINE_SCHEMA
@@ -146,7 +168,7 @@ class PostgresExperimentExecutor:
                     )
                 )
                 self._skip_remaining(step_results, 3)
-                return step_results
+                return execution_result
 
             # 3. LOAD_SEED_DATA
             seed_sql = fixture.read_seed_data(root)
@@ -178,7 +200,7 @@ class PostgresExperimentExecutor:
                     )
                 )
                 self._skip_remaining(step_results, 4)
-                return step_results
+                return execution_result
 
             # 4. APPLY_MIGRATION
             migration_sql = fixture.read_migration(root)
@@ -273,14 +295,16 @@ class PostgresExperimentExecutor:
                 try:
                     with conn.cursor() as cur:
                         cur.execute(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE;')
-                except Exception as clean_exc:
-                    logger.warning("Failed to drop schema %s: %s", schema_name, clean_exc)
+                    execution_result.cleanup_succeeded = True
+                except Exception:
+                    execution_result.cleanup_succeeded = False
+                    logger.warning("Failed to drop isolated experiment schema")
                 try:
                     conn.close()
                 except Exception:
                     pass
 
-        return step_results
+        return execution_result
 
     def _skip_remaining(self, step_results: list[ExperimentStepResult], from_order: int) -> None:
         type_map = {

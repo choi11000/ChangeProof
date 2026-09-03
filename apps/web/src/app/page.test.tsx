@@ -268,7 +268,9 @@ describe("Home", () => {
           run: {
             id: "run_001",
             experiment_plan_id: "plan_001",
-            plan_digest: "a1b2c3d4e5f67890",
+            experiment_contract_digest: "contract_a1b2c3d4e5f67890",
+            subject_digest: "subject_a1b2c3d4e5f67890",
+            cleanup_succeeded: true,
             template: "DROPPED_COLUMN_REFERENCE",
             verdict: "PROVEN_FAIL",
             started_at: "2026-09-03T00:00:00Z",
@@ -321,6 +323,7 @@ describe("Home", () => {
     );
     expect(screen.getByText("REPRODUCED • PROVEN FAIL")).toBeInTheDocument();
     expect(screen.getByText(/SQLSTATE: 42703/)).toBeInTheDocument();
-    expect(screen.getByText(/a1b2c3d4e5f67890/)).toBeInTheDocument();
+    expect(screen.getByText("contract_a1b2c3d4e5f67890")).toBeInTheDocument();
+    expect(screen.getByText("subject_a1b2c3d4e5f67890")).toBeInTheDocument();
   });
 });

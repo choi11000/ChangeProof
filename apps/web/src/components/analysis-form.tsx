@@ -127,12 +127,14 @@ type ExperimentStepResult = {
 type ExperimentRun = {
   id: string;
   experiment_plan_id: string;
-  plan_digest: string;
+  experiment_contract_digest: string;
+  subject_digest: string;
   template: ExperimentTemplate;
   verdict: ExperimentVerdict;
   started_at: string;
   finished_at: string;
   step_results: ExperimentStepResult[];
+  cleanup_succeeded?: boolean | null;
   summary: string;
 };
 
@@ -230,7 +232,7 @@ export function AnalysisForm() {
     }
   }
 
-  async function runExperiment(fixtureId: string, planId: string, planDigest?: string | null) {
+  async function runExperiment(fixtureId: string, planId: string) {
     setExecutingPlanId(planId);
     setExecutionError(null);
     try {
@@ -240,7 +242,6 @@ export function AnalysisForm() {
         body: JSON.stringify({
           fixture_id: fixtureId,
           experiment_plan_id: planId,
-          plan_digest: planDigest ?? undefined,
         }),
       });
       const body = await response.json();
@@ -483,7 +484,6 @@ export function AnalysisForm() {
                                     runExperiment(
                                       result.controlled_fixture_id!,
                                       matchingPlan.id,
-                                      matchingPlan.plan_digest,
                                     )
                                   }
                                 >
@@ -571,7 +571,11 @@ export function AnalysisForm() {
                               </ul>
 
                               <div className="plan-digest-footer">
-                                Canonical Plan Digest: <code>{executionRun.plan_digest}</code>
+                                Experiment Contract: <code>{executionRun.experiment_contract_digest}</code>
+                                <br />
+                                Subject: <code>{executionRun.subject_digest}</code>
+                                <br />
+                                Cleanup: {executionRun.cleanup_succeeded === true ? "SUCCEEDED" : executionRun.cleanup_succeeded === false ? "FAILED" : "UNKNOWN"}
                               </div>
                             </div>
                           )}

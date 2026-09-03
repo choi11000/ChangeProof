@@ -60,6 +60,7 @@ def test_executor_successful_dropped_column_run() -> None:
     assert mock_conn.closed is True
     assert any("CREATE SCHEMA" in q for q in executed)
     assert any("DROP SCHEMA" in q and "CASCADE" in q for q in executed)
+    assert results.cleanup_succeeded is True
 
 
 def test_executor_handles_query_failure_with_sqlstate() -> None:

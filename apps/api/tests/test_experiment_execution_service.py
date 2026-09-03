@@ -72,8 +72,8 @@ def test_service_executes_controlled_fixture_producing_proven_fail() -> None:
     assert run.experiment_plan_id == "plan_test_01"
     assert run.template is ExperimentTemplate.DROPPED_COLUMN_REFERENCE
     assert run.verdict is ExperimentVerdict.PROVEN_FAIL
-    assert run.plan_digest is not None
-    assert len(run.plan_digest) > 0
+    assert run.experiment_contract_digest.startswith("contract_")
+    assert run.subject_digest.startswith("subject_")
     assert len(run.step_results) == 6
     assert "Failure reproduced in isolated PostgreSQL" in run.summary
 

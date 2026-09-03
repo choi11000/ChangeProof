@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.experiment import ExperimentStepType, ExperimentTemplate
 
@@ -36,19 +36,22 @@ class ExperimentStepResult(BaseModel):
 class ExperimentRun(BaseModel):
     id: str
     experiment_plan_id: str
-    plan_digest: str
+    experiment_contract_digest: str
+    subject_digest: str
     template: ExperimentTemplate
     verdict: ExperimentVerdict
     started_at: datetime
     finished_at: datetime
     step_results: list[ExperimentStepResult] = Field(default_factory=list)
+    cleanup_succeeded: bool | None = None
     summary: str
 
 
 class ExecuteExperimentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     fixture_id: str
     experiment_plan_id: str | None = None
-    plan_digest: str | None = None
 
 
 class ExecuteExperimentResponse(BaseModel):
