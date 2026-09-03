@@ -1,0 +1,60 @@
+name: changeproof
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: changeproof
+      POSTGRES_USER: changeproof
+      POSTGRES_PASSWORD: changeproof
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U changeproof -d changeproof"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+    volumes:
+      - changeproof-data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ./apps/api
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://changeproof:changeproof@postgres:5432/changeproof}
+      SANDBOX_DATABASE_URL: ${SANDBOX_DATABASE_URL:-postgresql+psycopg://changeproof:changeproof@sandbox-postgres:5432/changeproof_sandbox}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: ./apps/web
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+  sandbox-postgres:
+    image: postgres:17.6-alpine
+    profiles: ["sandbox"]
+    environment:
+      POSTGRES_DB: changeproof_sandbox
+      POSTGRES_USER: changeproof
+      POSTGRES_PASSWORD: changeproof
+    tmpfs:
+      - /var/lib/postgresql/data
+
+volumes:
+  changeproof-data:

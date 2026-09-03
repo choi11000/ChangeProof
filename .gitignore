@@ -1,0 +1,17 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.coverage
+*.egg-info/
+*.py[cod]
+node_modules/
+.next/
+coverage/
+dist/
+*.tsbuildinfo
+.DS_Store
+*.log
+.idea/
+.vscode/
