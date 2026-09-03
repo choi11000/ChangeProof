@@ -211,6 +211,7 @@ class PullRequestService:
             evidences,
             scan_complete=snapshot.scan_complete,
             existing_warnings=warnings,
+            head_sha=metadata.head_sha,
         )
         warnings.extend(plan_warnings)
         for step in plan_steps:
@@ -263,6 +264,7 @@ class PullRequestService:
             experiment_plans=plans,
             execution_allowed=execution_allowed,
             controlled_fixture_id=controlled_fixture_id,
+            ai_usage=self._planning_service.last_usage,
             warnings=warnings,
             completed_steps=completed_steps,
         )

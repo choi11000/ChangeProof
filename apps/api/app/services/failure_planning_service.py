@@ -2,19 +2,19 @@ import logging
 
 from app.analyzers.experiment_compiler import ExperimentCompiler, ExperimentCompilerError
 from app.clients.openai_client import (
-    ChangeFactSummary,
-    EvidenceSummary,
-    FailurePlanningContext,
+    HypothesisGenerationResult,
     HypothesisGenerator,
     OpenAIAuthError,
     OpenAIRateLimitError,
     OpenAIResponseError,
     OpenAITimeoutError,
 )
+from app.schemas.ai import AIUsageMetadata
 from app.schemas.dependency import ChangeFact, DependencyEvidence
 from app.schemas.experiment import ExperimentPlan, ExperimentTemplate
 from app.schemas.github import AnalysisStep, AnalysisWarning, AnalysisWarningCode
 from app.schemas.hypothesis import FailureHypothesis
+from app.services.planning_context_budget import PlanningContextBudgeter
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +28,12 @@ class FailurePlanningService:
         self,
         generator: HypothesisGenerator | None = None,
         compiler: ExperimentCompiler | None = None,
+        budgeter: PlanningContextBudgeter | None = None,
     ) -> None:
         self.generator = generator
         self.compiler = compiler or ExperimentCompiler()
+        self.budgeter = budgeter or PlanningContextBudgeter()
+        self.last_usage: AIUsageMetadata | None = None
 
     async def plan(
         self,
@@ -39,6 +42,7 @@ class FailurePlanningService:
         *,
         scan_complete: bool = True,
         existing_warnings: list[AnalysisWarning] | None = None,
+        head_sha: str = "unknown",
     ) -> tuple[
         list[FailureHypothesis],
         list[ExperimentPlan],
@@ -47,6 +51,7 @@ class FailurePlanningService:
     ]:
         warnings: list[AnalysisWarning] = []
         completed_steps: list[AnalysisStep] = []
+        self.last_usage = None
 
         if not changes:
             # Nothing changed; no hypothesis to plan
@@ -66,35 +71,22 @@ class FailurePlanningService:
             )
             return [], [], warnings, completed_steps
 
-        # 1. Build minimal safe context
-        context = FailurePlanningContext(
-            changes=[
-                ChangeFactSummary(
-                    id=c.id,
-                    operation=c.change.operation.value,
-                    table=c.change.table,
-                    column=c.change.column,
-                )
-                for c in changes
-            ],
-            evidence=[
-                EvidenceSummary(
-                    id=e.id,
-                    path=e.path,
-                    line=e.line,
-                    match_kind=e.match_kind.value,
-                    excerpt=e.excerpt,
-                    changed_in_pull_request=e.changed_in_pull_request,
-                )
-                for e in evidence
-            ],
+        context = self.budgeter.build(
+            changes,
+            evidence,
+            existing_warnings or [],
+            head_sha=head_sha,
             scan_complete=scan_complete,
-            warnings=[w.message for w in (existing_warnings or [])],
         )
 
         # 2. Call Hypothesis Generator
         try:
-            proposal = await self.generator.generate(context)
+            generated = await self.generator.generate(context)
+            if isinstance(generated, HypothesisGenerationResult):
+                proposal = generated.proposal
+                self.last_usage = generated.usage
+            else:
+                proposal = generated
             completed_steps.append(AnalysisStep.GENERATE_FAILURE_HYPOTHESES)
         except OpenAIAuthError as exc:
             warnings.append(

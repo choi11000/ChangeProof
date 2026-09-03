@@ -11,6 +11,7 @@ from app.clients.github import (
     GitHubAuthenticationError,
     GitHubClient,
     GitHubFileContentUnavailable,
+    GitHubPrivateRepositoryRestricted,
     GitHubPullRequestNotFound,
     GitHubRateLimitError,
     GitHubRepositoryNotFound,
@@ -57,6 +58,50 @@ def test_fetch_pull_request_metadata() -> None:
         assert result.repository == "acme/risky-saas"
         assert result.base_sha == "base-sha"
         assert result.author == "octocat"
+
+    run(scenario())
+
+
+def test_repository_metadata_public_allowed_and_private_policy_enforced() -> None:
+    async def scenario() -> None:
+        public_client = response_handler(
+            lambda request: httpx.Response(
+                200,
+                json={
+                    "full_name": "acme/public",
+                    "private": False,
+                    "visibility": "public",
+                    "archived": False,
+                },
+            )
+        )
+        async with public_client:
+            metadata = await GitHubClient(public_client).verify_repository(repository)
+        assert metadata.private is False
+        assert metadata.visibility == "public"
+
+        private_payload = {
+            "full_name": "secret/customer",
+            "private": True,
+            "visibility": "private",
+        }
+        private_client = response_handler(
+            lambda request: httpx.Response(200, json=private_payload)
+        )
+        async with private_client:
+            with pytest.raises(
+                GitHubPrivateRepositoryRestricted,
+                match="restricted to public repositories",
+            ) as captured:
+                await GitHubClient(private_client).verify_repository(repository)
+        assert "secret/customer" not in str(captured.value)
+
+        dev_client = response_handler(lambda request: httpx.Response(200, json=private_payload))
+        async with dev_client:
+            metadata = await GitHubClient(
+                dev_client, public_repositories_only=False
+            ).verify_repository(repository)
+        assert metadata.private is True
 
     run(scenario())
 

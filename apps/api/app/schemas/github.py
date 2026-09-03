@@ -2,6 +2,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+from app.schemas.ai import AIUsageMetadata
 from app.schemas.dependency import (
     ChangeFact,
     DependencyEvidence,
@@ -20,6 +21,13 @@ class GitHubRepositoryRef(BaseModel):
     @property
     def full_name(self) -> str:
         return f"{self.owner}/{self.repo}"
+
+
+class GitHubRepositoryMetadata(BaseModel):
+    full_name: str
+    private: bool
+    visibility: str | None = None
+    archived: bool = False
 
 
 class PullRequestMetadata(BaseModel):
@@ -150,6 +158,7 @@ class PullRequestAnalysis(BaseModel):
     experiment_plans: list[ExperimentPlan] = Field(default_factory=list)
     execution_allowed: bool = False
     controlled_fixture_id: str | None = None
+    ai_usage: AIUsageMetadata | None = None
     warnings: list[AnalysisWarning] = Field(default_factory=list)
     completed_steps: list[AnalysisStep] = Field(default_factory=list)
 

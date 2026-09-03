@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.core.config import Settings, get_settings
+from app.core.rate_limit import enforce_experiment_rate_limit
+from app.core.sandbox_gate import SandboxExecutionGate, get_sandbox_gate
 from app.executors.postgres_experiment import PostgresExperimentExecutor
 from app.schemas.execution import (
     ExecuteExperimentRequest,
@@ -29,18 +31,16 @@ def get_experiment_execution_service(
 )
 def execute_experiment(
     payload: ExecuteExperimentRequest,
+    _rate_limit: None = Depends(enforce_experiment_rate_limit),  # noqa: B008
+    gate: SandboxExecutionGate = Depends(get_sandbox_gate),  # noqa: B008
     service: ExperimentExecutionService = Depends(get_experiment_execution_service),  # noqa: B008
 ) -> ExecuteExperimentResponse:
     try:
-        run = service.execute(payload)
+        with gate.slot():
+            run = service.execute(payload)
         return ExecuteExperimentResponse(run=run)
     except UnknownFixtureError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
-        ) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Experiment sandbox execution failed: {exc}",
         ) from exc

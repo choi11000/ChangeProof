@@ -12,9 +12,11 @@ from openai import (
 )
 from pydantic import BaseModel, Field
 
+from app.schemas.ai import AIUsageMetadata, PlanningContextStats
 from app.schemas.hypothesis import HypothesisProposalResult
 
 logger = logging.getLogger(__name__)
+FAILURE_HYPOTHESIS_PROMPT_VERSION = "v1"
 
 SYSTEM_PROMPT = (
     "You are ChangeProof's evidence-grounded failure hypothesis reasoning agent. "
@@ -46,18 +48,41 @@ class ChangeFactSummary(BaseModel):
 
 class EvidenceSummary(BaseModel):
     id: str
+    target: str = ""
     path: str
     line: int
     match_kind: str
     excerpt: str
+    source_scope: str = "APPLICATION"
     changed_in_pull_request: bool
 
 
 class FailurePlanningContext(BaseModel):
+    head_sha: str = "unknown"
     changes: list[ChangeFactSummary] = Field(default_factory=list)
     evidence: list[EvidenceSummary] = Field(default_factory=list)
     scan_complete: bool = True
     warnings: list[str] = Field(default_factory=list)
+    context_truncated: bool = False
+    stats: PlanningContextStats = Field(
+        default_factory=lambda: PlanningContextStats(
+            available_changes=0,
+            used_changes=0,
+            available_evidence=0,
+            used_evidence=0,
+            available_warnings=0,
+            used_warnings=0,
+        )
+    )
+
+
+class HypothesisGenerationResult(BaseModel):
+    proposal: HypothesisProposalResult
+    usage: AIUsageMetadata
+
+    @property
+    def hypotheses(self):
+        return self.proposal.hypotheses
 
 
 class OpenAIClientError(Exception):
@@ -86,7 +111,7 @@ class HypothesisGenerator(Protocol):
     async def generate(
         self,
         context: FailurePlanningContext,
-    ) -> HypothesisProposalResult: ...
+    ) -> HypothesisProposalResult | HypothesisGenerationResult: ...
 
 
 class OpenAIHypothesisClient:
@@ -99,9 +124,11 @@ class OpenAIHypothesisClient:
         api_key: str | None = None,
         model: str = "gpt-4o-mini",
         timeout: float = 30.0,
+        max_output_tokens: int = 1200,
     ) -> None:
         self.model = model
         self.timeout = timeout
+        self.max_output_tokens = max_output_tokens
         if client is not None:
             self._client = client
         elif api_key:
@@ -116,7 +143,7 @@ class OpenAIHypothesisClient:
     async def generate(
         self,
         context: FailurePlanningContext,
-    ) -> HypothesisProposalResult:
+    ) -> HypothesisGenerationResult:
         if not self._client:
             raise OpenAIAuthError("OpenAI API key is not configured")
 
@@ -134,6 +161,7 @@ class OpenAIHypothesisClient:
                     f"{user_content}"
                 ),
                 text_format=HypothesisProposalResult,
+                max_output_tokens=self.max_output_tokens,
             )
         except AuthenticationError as exc:
             raise OpenAIAuthError(f"OpenAI authentication failed: {exc}") from exc
@@ -149,12 +177,25 @@ class OpenAIHypothesisClient:
         duration = time.monotonic() - start_time
         parsed = response.output_parsed
 
+        usage = getattr(response, "usage", None)
+        metadata = AIUsageMetadata(
+            model=self.model,
+            prompt_version=FAILURE_HYPOTHESIS_PROMPT_VERSION,
+            fingerprint="uncached",
+            input_tokens=self._usage_value(usage, "input_tokens"),
+            output_tokens=self._usage_value(usage, "output_tokens"),
+            total_tokens=self._usage_value(usage, "total_tokens"),
+            context=context.stats,
+        )
+
         if parsed is None:
             logger.warning(
                 "OpenAI response contained no parsed output or was refused",
                 extra={"model": self.model, "duration": duration},
             )
-            return HypothesisProposalResult(hypotheses=[])
+            return HypothesisGenerationResult(
+                proposal=HypothesisProposalResult(hypotheses=[]), usage=metadata
+            )
 
         logger.info(
             "Generated failure hypotheses from OpenAI Responses API",
@@ -164,6 +205,14 @@ class OpenAIHypothesisClient:
                 "change_count": len(context.changes),
                 "evidence_count": len(context.evidence),
                 "duration": duration,
+                "prompt_version": FAILURE_HYPOTHESIS_PROMPT_VERSION,
+                "input_tokens": metadata.input_tokens,
+                "output_tokens": metadata.output_tokens,
             },
         )
-        return parsed
+        return HypothesisGenerationResult(proposal=parsed, usage=metadata)
+
+    @staticmethod
+    def _usage_value(usage: object | None, name: str) -> int | None:
+        value = getattr(usage, name, None)
+        return value if isinstance(value, int) and value >= 0 else None

@@ -22,11 +22,20 @@ services:
       context: ./apps/api
     environment:
       APP_ENV: ${APP_ENV:-development}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      API_DOCS_ENABLED: ${API_DOCS_ENABLED:-true}
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://changeproof:changeproof@postgres:5432/changeproof}
       SANDBOX_DATABASE_URL: ${SANDBOX_DATABASE_URL:-postgresql+psycopg://changeproof:changeproof@sandbox-postgres:5432/changeproof_sandbox}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_MAX_OUTPUT_TOKENS: ${OPENAI_MAX_OUTPUT_TOKENS:-1200}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_PUBLIC_REPOSITORIES_ONLY: ${GITHUB_PUBLIC_REPOSITORIES_ONLY:-true}
+      ANALYSIS_RATE_LIMIT: ${ANALYSIS_RATE_LIMIT:-10}
+      EXPERIMENT_RATE_LIMIT: ${EXPERIMENT_RATE_LIMIT:-6}
+      PROOF_RATE_LIMIT: ${PROOF_RATE_LIMIT:-3}
+      TRUST_PROXY_HEADERS: ${TRUST_PROXY_HEADERS:-false}
+      MAX_CONCURRENT_SANDBOX_RUNS: ${MAX_CONCURRENT_SANDBOX_RUNS:-2}
     depends_on:
       postgres:
         condition: service_healthy
@@ -41,6 +50,10 @@ services:
   web:
     build:
       context: ./apps/web
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_DEMO_REPOSITORY: ${NEXT_PUBLIC_DEMO_REPOSITORY:-}
+        NEXT_PUBLIC_DEMO_PR: ${NEXT_PUBLIC_DEMO_PR:-}
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     depends_on:

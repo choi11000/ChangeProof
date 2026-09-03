@@ -4,6 +4,7 @@ from app.api.analyses import get_pull_request_service
 from app.clients.github import (
     GitHubApiUnavailable,
     GitHubAuthenticationError,
+    GitHubPrivateRepositoryRestricted,
     GitHubPullRequestNotFound,
     GitHubRateLimitError,
     GitHubRepositoryNotFound,
@@ -72,6 +73,7 @@ def test_domain_errors_are_mapped_to_safe_http_statuses() -> None:
         (GitHubAuthenticationError("authentication failed"), 401),
         (GitHubRateLimitError(), 429),
         (GitHubApiUnavailable("upstream unavailable"), 502),
+        (GitHubPrivateRepositoryRestricted(), 403),
     ]
     client = TestClient(app)
     for error, expected_status in cases:

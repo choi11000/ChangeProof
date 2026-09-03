@@ -124,6 +124,9 @@ def test_openai_successful_structured_output() -> None:
     )
     mock_response = MagicMock()
     mock_response.output_parsed = expected_result
+    mock_response.usage.input_tokens = 101
+    mock_response.usage.output_tokens = 22
+    mock_response.usage.total_tokens = 123
     mock_openai.responses.parse = AsyncMock(return_value=mock_response)
 
     client = OpenAIHypothesisClient(client=mock_openai)
@@ -131,6 +134,10 @@ def test_openai_successful_structured_output() -> None:
 
     assert len(result.hypotheses) == 1
     assert result.hypotheses[0].id == "hyp_001"
+    assert result.usage.input_tokens == 101
+    assert result.usage.output_tokens == 22
+    assert result.usage.total_tokens == 123
+    assert mock_openai.responses.parse.await_args.kwargs["max_output_tokens"] == 1200
 
 
 def test_openai_model_refusal_or_empty_returns_empty_list() -> None:
@@ -143,3 +150,13 @@ def test_openai_model_refusal_or_empty_returns_empty_list() -> None:
     result = asyncio.run(client.generate(_sample_context()))
 
     assert result.hypotheses == []
+
+
+def test_missing_usage_is_safe() -> None:
+    mock_openai = MagicMock()
+    mock_response = MagicMock(spec=["output_parsed"])
+    mock_response.output_parsed = HypothesisProposalResult(hypotheses=[])
+    mock_openai.responses.parse = AsyncMock(return_value=mock_response)
+    result = asyncio.run(OpenAIHypothesisClient(client=mock_openai).generate(_sample_context()))
+    assert result.usage.input_tokens is None
+    assert result.usage.total_tokens is None

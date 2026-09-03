@@ -10,6 +10,7 @@ from app.schemas.github import (
     ChangedFile,
     ChangedFileStatus,
     GitHubFileContent,
+    GitHubRepositoryMetadata,
     GitHubRepositoryRef,
     PullRequestMetadata,
 )
@@ -48,15 +49,41 @@ class GitHubFileContentUnavailable(GitHubError):
     pass
 
 
-class GitHubClient:
-    def __init__(self, http_client: httpx.AsyncClient) -> None:
-        self._http = http_client
+class GitHubPrivateRepositoryRestricted(GitHubError):
+    def __init__(self, _message: str | None = None) -> None:
+        super().__init__(
+            "Repository analysis is restricted to public repositories in this deployment."
+        )
 
-    async def verify_repository(self, repository: GitHubRepositoryRef) -> None:
-        await self._get(
+
+class GitHubClient:
+    def __init__(
+        self, http_client: httpx.AsyncClient, *, public_repositories_only: bool = True
+    ) -> None:
+        self._http = http_client
+        self._public_repositories_only = public_repositories_only
+
+    async def verify_repository(
+        self, repository: GitHubRepositoryRef
+    ) -> GitHubRepositoryMetadata:
+        data = await self._get(
             f"/repos/{repository.owner}/{repository.repo}",
             not_found=GitHubRepositoryNotFound("GitHub repository not found"),
         )
+        try:
+            if not isinstance(data, dict):
+                raise TypeError
+            metadata = GitHubRepositoryMetadata(
+                full_name=data.get("full_name", repository.full_name),
+                private=bool(data.get("private", False)),
+                visibility=data.get("visibility"),
+                archived=bool(data.get("archived", False)),
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            raise GitHubApiUnavailable("GitHub returned an invalid repository response") from error
+        if metadata.private and self._public_repositories_only:
+            raise GitHubPrivateRepositoryRestricted()
+        return metadata
 
     async def fetch_pull_request(
         self, repository: GitHubRepositoryRef, number: int
