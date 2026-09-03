@@ -8,9 +8,9 @@ ChangeProof never converts an LLM opinion directly into a verdict. Facts come fr
 1. Change Intake             GitHub pull request                    COMPLETE
 2. Change Understanding      File classification + SQL parsing     COMPLETE
 3. Dependency Discovery      Application <-> schema                COMPLETE
-4. Failure Hypothesis                                               NEXT
-5. Experiment Planning
-6. Execution                 Ephemeral PostgreSQL
+4. Failure Hypothesis        Evidence-grounded AI reasoning        COMPLETE
+5. Experiment Planning       Deterministic ExperimentCompiler      COMPLETE
+6. Execution                 Ephemeral PostgreSQL                   NEXT
 7. Evidence                  Observed results
 8. Remediation
 9. Re-execution              Same experiment
@@ -21,13 +21,16 @@ The product promise is not merely to predict failure. ChangeProof is designed to
 
 ## Runtime components
 
-- `apps/web`: Next.js App Router interface for PR input, change facts, and dependency evidence.
+- `apps/web`: Next.js App Router interface for PR input, change facts, dependency evidence, failure hypotheses, and experiment plans.
 - `apps/api`: FastAPI HTTP boundary and explicit change analysis pipeline.
 - `clients/github.py`: timeout-bounded GitHub REST access for PRs, files, and repository trees.
-- `services/pull_request_service.py`: change-intake and dependency discovery orchestration.
+- `clients/openai_client.py`: timeout-bounded OpenAI client using Structured Outputs.
+- `services/pull_request_service.py`: change-intake, dependency discovery, and planning orchestration.
 - `services/repository_source_service.py`: bounded source snapshot collection at PR head SHA.
+- `services/failure_planning_service.py`: safe failure planning orchestration and domain validation.
 - `analyzers/file_classifier.py`: deterministic path-based classification and content policy.
 - `analyzers/dependency.py`: deterministic target extraction, reference matching, and impact summary.
+- `analyzers/experiment_compiler.py`: deterministic compiler generating executable, read-oriented experiment plans.
 - `postgres`: persistent product data such as analyses, steps, and evidence.
 - `sandbox-postgres`: opt-in disposable target for migration validation.
 - `samples/risky-saas`: synthetic demonstration repository with known-positive risks.
@@ -50,7 +53,14 @@ References are matched using deterministic identifier boundaries and categorized
 
 This phase provides deterministic source-reference evidence, not compiler-level semantic dependency proof.
 
-The intake records the completed steps `FETCH_PR_METADATA`, `FETCH_CHANGED_FILES`, `CLASSIFY_FILES`, `FETCH_SQL_CONTENT`, `ANALYZE_SQL`, `EXTRACT_DEPENDENCY_TARGETS`, `FETCH_REPOSITORY_TREE`, `FETCH_APPLICATION_CONTENT`, `DISCOVER_DEPENDENCIES`, and `SUMMARIZE_IMPACT`. Logs contain only repository/PR identifiers and aggregate facts.
+## Failure hypothesis & executable experiment planning
+
+Phase 5 introduces AI reasoning strictly bounded by deterministic facts:
+1. **AI Hypothesis Generator**: An LLM reads only minimal structured context (change facts, evidence summaries, scan completeness, and warnings). It proposes testable `FailureHypothesis` records (`status=UNVERIFIED`) and selects an allowlisted `ExperimentTemplate`. The prompt boundary enforces that repository excerpts are untrusted data; the AI cannot invent IDs or generate arbitrary commands.
+2. **Domain Validation**: The service validates that referenced change IDs and evidence IDs strictly belong to the provided set, and ensures the template is allowlisted.
+3. **Deterministic Experiment Compiler**: `ExperimentCompiler` generates executable `ExperimentPlan` records (`status=NOT_EXECUTED`) using allowlisted, safe, read-only SQL patterns without shell command execution.
+
+The intake records the completed steps `FETCH_PR_METADATA`, `FETCH_CHANGED_FILES`, `CLASSIFY_FILES`, `FETCH_SQL_CONTENT`, `ANALYZE_SQL`, `BUILD_CHANGE_FACTS`, `EXTRACT_DEPENDENCY_TARGETS`, `FETCH_REPOSITORY_TREE`, `FETCH_APPLICATION_CONTENT`, `DISCOVER_DEPENDENCIES`, `SUMMARIZE_IMPACT`, `GENERATE_FAILURE_HYPOTHESES`, `VALIDATE_HYPOTHESES`, and `COMPILE_EXPERIMENT_PLANS`. Logs contain only repository/PR identifiers and aggregate facts.
 
 ## Planned analysis state
 

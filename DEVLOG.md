@@ -166,5 +166,51 @@ Commits:
 - `0f8d091 feat: discover application references to schema changes`
 - `6cfd26c test: cover cross-layer dependency discovery`
 - `1461df1 docs: document dependency evidence architecture`
+- `00ee4b4 fix: harden dependency evidence semantics`
+
+## 2026-09-03 — Phase 5 Evidence-Grounded Failure Hypothesis & Executable Experiment Planning
+
+### Added
+
+- Typed failure hypothesis schemas (`FailureHypothesis`, `FailureCategory`, `HypothesisStatus`, `HypothesisProposalResult`)
+- Typed experiment plan schemas (`ExperimentPlan`, `ExperimentTemplate`, `ExperimentStep`, `ExperimentStepType`, `ExperimentStatus`)
+- OpenAI client layer (`OpenAIHypothesisClient`) with Responses API, Structured Outputs, and domain error mapping
+- Prompt injection boundary declaring repository content as untrusted data
+- Safe failure planning service (`FailurePlanningService`) with domain validation (ID containment, template allowlist, max 3 hypotheses)
+- Deterministic experiment compiler (`ExperimentCompiler`) generating safe, read-only SQL validation queries without shell execution
+- Acceptance test for Phase 5 failure hypothesis generation and experiment planning
+- Prompt injection safety test with malicious code comments
+- Frontend Failure Hypotheses & Proposed Experiment Plans display with `UNVERIFIED` and `NOT EXECUTED YET` badges
+- Architecture decision record `docs/adr/007-failure-hypothesis-planning.md`
+
+### Decisions
+
+- AI reasoning is introduced strictly for hypothesis proposals; deterministic compiler produces the executable plan.
+- Arbitrary commands, arbitrary SQL, shell access, and Docker commands are strictly prohibited in the LLM output.
+- Hypotheses remain UNVERIFIED and plans remain NOT_EXECUTED until actual execution in Phase 6 sandbox.
+- If OpenAI is not configured, rate limited, or fails, the pipeline degrades gracefully with typed warnings without failing PR analysis.
+- Domain validation drops any hypothesis that hallucinates non-existent change IDs or evidence IDs.
+
+### Tests
+
+- API: `pytest` PASS (113 tests, 96.92% coverage)
+- API: `ruff check .` PASS
+- API: Python bytecode compilation PASS
+- Web: `npm ci`, ESLint, TypeScript typecheck, Vitest (4 tests), and production build PASS
+- Web: `npm audit` PASS (0 vulnerabilities)
+- Browser smoke: live web/API interaction, form submission, and error flow PASS with no console errors
+- Real OpenAI smoke: live `gpt-4o-mini` structured output test PASS
+- Docker: NOT REQUIRED for Phase 5 (No sandbox execution until Phase 6)
+
+### Known Limitations
+
+- Hypotheses are evidence-grounded proposals and remain unverified until executed in Phase 6 ephemeral environments.
+- FastAPI/Starlette TestClient emits two upstream deprecation warnings involving `httpx`.
+- Docker is not installed on this host.
+
+### Git
+
+Branch: `feature/failure-experiment-planning` (stacked on `feature/dependency-discovery`)
+
 
 

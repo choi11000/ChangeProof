@@ -13,7 +13,7 @@ ChangeProof is an evidence-backed database change risk agent. It turns real pull
 - Evidence-linked deterministic risk scoring
 - Remediation and re-validation
 
-The current stacked development branch ingests a GitHub pull request, classifies changed files, parses SQL migrations at the exact PR revision, discovers cross-layer application source references against the full repository snapshot at `head_sha`, and presents deterministic impact evidence.
+The current stacked development branch ingests a GitHub pull request, classifies changed files, parses SQL migrations at the exact PR revision, discovers cross-layer application source references across the full repository tree at `head_sha`, derives evidence-grounded failure hypotheses, and compiles safe, executable experiment plans for reproduction.
 
 ## Quick start
 
@@ -58,5 +58,6 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for native setup, tests, and project conven
 | 2 — SQL migration parser | Complete on `feature/sql-change-parser`; not merged to `main` |
 | 3 — GitHub PR intake | Complete on stacked `feature/github-pr-intake`; not merged to `main` |
 | 4 — Dependency discovery | Complete on stacked `feature/dependency-discovery`; not merged to `main` |
+| 5 — Failure hypothesis & experiment planning | Complete on stacked `feature/failure-experiment-planning`; not merged to `main` |
 
 See [DEVLOG.md](DEVLOG.md) for verified results and branch dependencies.
