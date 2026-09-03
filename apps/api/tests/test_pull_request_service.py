@@ -7,7 +7,13 @@ import pytest
 
 from app.analyzers.sql_migration import SqlMigrationParser
 from app.clients.github import GitHubClient
-from app.schemas.github import AnalysisWarningCode, ContentSource, FileCategory
+from app.schemas.dependency import DependencyMatchKind
+from app.schemas.github import (
+    AnalysisStep,
+    AnalysisWarningCode,
+    ContentSource,
+    FileCategory,
+)
 from app.schemas.sql_change import SqlOperation
 from app.services.pull_request_service import (
     InvalidGitHubRepository,
@@ -63,6 +69,22 @@ def test_mocked_pr_pipeline_classifies_and_parses_full_sql_content() -> None:
         if path.endswith("/contents/migrations/005_drop_legacy_status.sql"):
             sql = "ALTER TABLE orders DROP COLUMN legacy_status;"
             return httpx.Response(200, json=_content(sql, "sql-sha"))
+        if "git/trees/head-sha" in path:
+            return httpx.Response(
+                200,
+                json={
+                    "sha": "head-sha",
+                    "tree": [
+                        {"path": "app/order_service.py", "type": "blob", "sha": "s1"},
+                    ],
+                    "truncated": False,
+                },
+            )
+        if path.endswith("/contents/app/order_service.py"):
+            return httpx.Response(
+                200,
+                json=_content("return order.legacy_status\n", "app-sha"),
+            )
         raise AssertionError(f"Unexpected request: {request.url}")
 
     async def scenario():
@@ -85,6 +107,103 @@ def test_mocked_pr_pipeline_classifies_and_parses_full_sql_content() -> None:
     assert change.operation is SqlOperation.DROP_COLUMN
     assert (change.table, change.column) == ("orders", "legacy_status")
     assert any("ref=head-sha" in request for request in requests)
+    assert len(result.dependency_targets) == 1
+    assert len(result.dependency_evidence) == 1
+    assert result.dependency_evidence[0].match_kind is DependencyMatchKind.QUALIFIED_REFERENCE
+
+
+def test_dependency_discovery_finds_unchanged_application_references() -> None:
+    """Acceptance test: PR only touches SQL migration; repo tree has unchanged application file."""
+    sql_content = "ALTER TABLE orders DROP COLUMN legacy_status;"
+    app_code = (
+        "from dataclasses import dataclass\n"
+        "\n"
+        "@dataclass\n"
+        "class Order:\n"
+        "    id: int\n"
+        "    legacy_status: str\n"
+        "\n"
+        "def serialize_order(order: Order) -> dict:\n"
+        "    return {'id': order.id, 'status': order.legacy_status}\n"
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path == "/repos/acme/risky-saas":
+            return httpx.Response(200, json={"full_name": "acme/risky-saas"})
+        if path == "/repos/acme/risky-saas/pulls/42":
+            return httpx.Response(200, json=_pull_request())
+        if path == "/repos/acme/risky-saas/pulls/42/files":
+            # Only the migration is changed in this PR!
+            return httpx.Response(
+                200,
+                json=[_file("migrations/001_drop_legacy_status.sql", patch="@@ -0,0 +1 @@")],
+            )
+        if path.endswith("/contents/migrations/001_drop_legacy_status.sql"):
+            return httpx.Response(200, json=_content(sql_content, "sql-sha"))
+        if "git/trees/head-sha" in path:
+            return httpx.Response(
+                200,
+                json={
+                    "sha": "head-sha",
+                    "tree": [
+                        {
+                            "path": "migrations/001_drop_legacy_status.sql",
+                            "type": "blob",
+                            "sha": "sql-sha",
+                        },
+                        {"path": "app/order_service.py", "type": "blob", "sha": "app-sha"},
+                    ],
+                    "truncated": False,
+                },
+            )
+        if path.endswith("/contents/app/order_service.py"):
+            return httpx.Response(200, json=_content(app_code, "app-sha"))
+        raise AssertionError(f"Unexpected request: {request.url}")
+
+    async def scenario():
+        http_client = httpx.AsyncClient(
+            base_url="https://api.github.test", transport=httpx.MockTransport(handler)
+        )
+        async with http_client:
+            service = PullRequestService(GitHubClient(http_client), SqlMigrationParser())
+            return await service.analyze("https://github.com/acme/risky-saas", 42)
+
+    result = asyncio.run(scenario())
+
+    assert len(result.dependency_targets) == 1
+    target = result.dependency_targets[0]
+    assert (target.table, target.column) == ("orders", "legacy_status")
+
+    # Critical Phase 4 verification:
+    # app/order_service.py was NOT in PR changed files, but its reference is discovered!
+    assert len(result.dependency_evidence) >= 1
+    qualified_evidence = next(
+        e for e in result.dependency_evidence
+        if e.match_kind is DependencyMatchKind.QUALIFIED_REFERENCE and e.line == 9
+    )
+    assert qualified_evidence.path == "app/order_service.py"
+    assert qualified_evidence.changed_in_pull_request is False
+    assert "order.legacy_status" in qualified_evidence.excerpt
+
+    assert result.impact_summary is not None
+    assert result.impact_summary.application_files_with_references == 1
+    assert result.impact_summary.scan_complete is True
+
+    # Check all completed steps
+    expected_steps = [
+        AnalysisStep.FETCH_PR_METADATA,
+        AnalysisStep.FETCH_CHANGED_FILES,
+        AnalysisStep.CLASSIFY_FILES,
+        AnalysisStep.FETCH_SQL_CONTENT,
+        AnalysisStep.ANALYZE_SQL,
+        AnalysisStep.EXTRACT_DEPENDENCY_TARGETS,
+        AnalysisStep.FETCH_REPOSITORY_TREE,
+        AnalysisStep.FETCH_APPLICATION_CONTENT,
+        AnalysisStep.DISCOVER_DEPENDENCIES,
+        AnalysisStep.SUMMARIZE_IMPACT,
+    ]
+    assert result.completed_steps == expected_steps
 
 
 def test_sql_file_failures_are_isolated() -> None:
@@ -115,6 +234,11 @@ def test_sql_file_failures_are_isolated() -> None:
         if path.endswith("/contents/migrations/removed.sql"):
             assert request.url.params["ref"] == "base-sha"
             return httpx.Response(200, json=_content("DROP TABLE old;", "removed"))
+        if "git/trees/head-sha" in path:
+            return httpx.Response(
+                200,
+                json={"sha": "head-sha", "tree": [], "truncated": False},
+            )
         raise AssertionError(path)
 
     async def scenario():

@@ -185,6 +185,48 @@ def test_timeout_is_mapped_without_exposing_request_details() -> None:
     run(scenario())
 
 
+def test_fetch_repository_tree_success_and_truncated() -> None:
+    async def scenario() -> None:
+        client = response_handler(
+            lambda request: httpx.Response(
+                200,
+                json={
+                    "sha": "head-sha",
+                    "tree": [
+                        {"path": "app/main.py", "type": "blob", "sha": "s1", "size": 100},
+                        {"path": "app", "type": "tree", "sha": "s2"},
+                    ],
+                    "truncated": True,
+                },
+            )
+        )
+        async with client:
+            result = await GitHubClient(client).fetch_repository_tree(repository, "head-sha")
+        assert len(result.entries) == 2
+        assert result.entries[0].path == "app/main.py"
+        assert result.entries[0].size == 100
+        assert result.truncated is True
+
+    run(scenario())
+
+
+def test_fetch_repository_tree_error_mappings() -> None:
+    async def scenario() -> None:
+        client_404 = response_handler(lambda request: httpx.Response(404))
+        async with client_404:
+            with pytest.raises(GitHubRepositoryNotFound):
+                await GitHubClient(client_404).fetch_repository_tree(repository, "bad-sha")
+
+        client_invalid = response_handler(
+            lambda request: httpx.Response(200, json={"not_a_tree": 1})
+        )
+        async with client_invalid:
+            with pytest.raises(GitHubApiUnavailable):
+                await GitHubClient(client_invalid).fetch_repository_tree(repository, "bad-sha")
+
+    run(scenario())
+
+
 def test_build_client_adds_token_only_to_request_headers() -> None:
     client = build_github_http_client("test-token")
 
