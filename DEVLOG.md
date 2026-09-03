@@ -432,6 +432,32 @@ Branch: `feature/public-deployment` (stacked on `feature/submission-hardening`)
 
 Branch: `feature/public-deployment` (stacked on `feature/submission-hardening`)
 
+## 2026-09-03 — Web Korean Default & Bilingual Language Switcher
+
+### Added & Resolved
+
+- **Korean Default & Bilingual i18n Architecture**:
+  - Implemented `apps/web/src/lib/i18n.tsx` with comprehensive translations dictionary for all UI sections:
+    - Top nav brand, status, and language switch controls
+    - Hero title, eyebrow, lede, 3-step proof flow, and 5-stage pipeline
+    - Design principles and capability card
+    - Pull request analysis form labels, inputs, load demo PR button, and hints
+    - Structured change facts, impact surface, and dependency evidence
+    - Failure hypotheses, AI reasoning cards, and deterministic experiment plans
+    - PostgreSQL sandbox execution verdict badges, error details, and invariants
+    - Compatibility remediation proof card, before/after comparison, and contract digests
+  - Set default language to Korean (`ko`) with immediate persistence in `localStorage`.
+  - Added `LanguageSwitcher` (`apps/web/src/components/language-switcher.tsx`) to top navigation with active state styling.
+  - Implemented lazy state initializer in `I18nProvider` satisfying React 19 / ESLint hooks rules.
+- **Frontend Verification & Live Deployment**:
+  - Vitest: **6/6 tests passing**, verifying both Korean default rendering and English toggle behavior.
+  - ESLint: **Clean (0 warnings, 0 errors)**.
+  - TypeScript: `tsc --noEmit` **Clean**.
+  - Turbopack production build: **Clean**.
+  - Railway public web deployment: Successfully deployed revision `87d4ee11-3da6-45f7-8a74-833103a75593` to `https://changeproof-web-production.up.railway.app`.
+  - Live Browser Acceptance: Verified live with `browser_subagent` (initial Korean load, English switch, return to Korean, demo PR analysis, and PostgreSQL failure reproduction).
+
+
 
 
 

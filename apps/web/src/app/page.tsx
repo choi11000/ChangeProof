@@ -1,47 +1,72 @@
-import { AnalysisForm } from "@/components/analysis-form";
+"use client";
 
-const stages = ["Understand", "Dependencies", "Validate", "Evidence", "Remediate"];
+import { AnalysisForm } from "@/components/analysis-form";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { useI18n } from "@/lib/i18n";
 
 export default function Home() {
+  const { t } = useI18n();
+
   return (
     <main>
       <nav aria-label="Primary navigation">
-        <a className="brand" href="#top">ChangeProof</a>
-        <span className="status"><i /> Systems ready</span>
+        <a className="brand" href="#top">
+          {t.brand}
+        </a>
+        <div className="nav-right">
+          <span className="status">
+            <i /> {t.systemsReady}
+          </span>
+          <LanguageSwitcher />
+        </div>
       </nav>
 
       <section className="hero" id="top">
-        <p className="eyebrow">DATABASE CHANGE RISK AGENT</p>
-        <h1>Prove a change is safe<br /><span>before it ships.</span></h1>
-        <p className="lede">
-          ChangeProof turns pull-request changes into validated evidence, deterministic risk,
-          and a remediation you can verify.
-        </p>
+        <p className="eyebrow">{t.heroEyebrow}</p>
+        <h1>
+          {t.heroTitle1}
+          <br />
+          <span>{t.heroTitle2}</span>
+        </h1>
+        <p className="lede">{t.heroLede}</p>
 
-        <ol className="judge-flow" aria-label="Three-step proof flow">
-          <li><b>1</b> Analyze the change</li>
-          <li><b>2</b> Reproduce the failure</li>
-          <li><b>3</b> Verify the fix</li>
+        <ol className="judge-flow" aria-label={t.flowAriaLabel}>
+          <li>
+            <b>1</b> {t.flowStep1}
+          </li>
+          <li>
+            <b>2</b> {t.flowStep2}
+          </li>
+          <li>
+            <b>3</b> {t.flowStep3}
+          </li>
         </ol>
 
         <AnalysisForm />
 
-        <ol className="pipeline" aria-label="Analysis pipeline">
-          {stages.map((stage, index) => (
-            <li key={stage}><b>{String(index + 1).padStart(2, "0")}</b>{stage}</li>
+        <ol className="pipeline" aria-label={t.pipelineAriaLabel}>
+          {t.stages.map((stage, index) => (
+            <li key={stage}>
+              <b>{String(index + 1).padStart(2, "0")}</b>
+              {stage}
+            </li>
           ))}
         </ol>
       </section>
 
       <section className="proof">
         <article>
-          <p className="eyebrow">DETERMINISTIC BY DESIGN</p>
-          <h2>Reasoning makes a hypothesis.<br />Evidence earns the verdict.</h2>
+          <p className="eyebrow">{t.principleEyebrow}</p>
+          <h2>
+            {t.principleTitle1}
+            <br />
+            {t.principleTitle2}
+          </h2>
         </article>
         <div className="principle-card">
-          <small>CURRENT CAPABILITY</small>
-          <strong>PR → structured change facts</strong>
-          <p>No invented risk score. Every fact starts with source we can inspect.</p>
+          <small>{t.capabilityLabel}</small>
+          <strong>{t.capabilityTitle}</strong>
+          <p>{t.capabilityDesc}</p>
         </div>
       </section>
     </main>

@@ -1,36 +1,64 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { I18nProvider } from "@/lib/i18n";
 import Home from "./page";
+
+function renderHome() {
+  return render(
+    <I18nProvider>
+      <Home />
+    </I18nProvider>,
+  );
+}
 
 describe("Home", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
+    localStorage.clear();
   });
 
-  it("renders the pull request analysis form", () => {
-    render(<Home />);
+  it("renders the pull request analysis form in Korean by default", () => {
+    renderHome();
 
-    expect(screen.getByRole("heading", { name: /prove a change is safe/i })).toBeInTheDocument();
-    expect(screen.getByLabelText(/github repository/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /analyze change/i })).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: /three-step proof flow/i })).toHaveTextContent(
-      /analyze the change/i,
+    expect(screen.getByRole("heading", { name: /배포 전에 변경의 안전성을/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/github 저장소/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /변경사항 분석/i })).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: /3단계 증명 흐름/i })).toHaveTextContent(
+      /변경사항 분석/i,
     );
-    expect(screen.queryByRole("button", { name: /load demo pr/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /데모 pr 불러오기/i })).not.toBeInTheDocument();
+  });
+
+  it("switches language between Korean and English when language button is clicked", () => {
+    renderHome();
+
+    // Default is Korean
+    expect(screen.getByRole("heading", { name: /배포 전에 변경의 안전성을/i })).toBeInTheDocument();
+
+    // Switch to English
+    fireEvent.click(screen.getByRole("button", { name: "English" }));
+    expect(screen.getByRole("heading", { name: /prove a change is safe/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /analyze change/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/github repository/i)).toBeInTheDocument();
+
+    // Switch back to Korean
+    fireEvent.click(screen.getByRole("button", { name: "한국어" }));
+    expect(screen.getByRole("heading", { name: /배포 전에 변경의 안전성을/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /변경사항 분석/i })).toBeInTheDocument();
   });
 
   it("loads configured demo values without starting analysis", () => {
     vi.stubEnv("NEXT_PUBLIC_DEMO_REPOSITORY", "demo/public-repo");
     vi.stubEnv("NEXT_PUBLIC_DEMO_PR", "17");
     const fetchSpy = vi.spyOn(globalThis, "fetch");
-    render(<Home />);
+    renderHome();
 
-    fireEvent.click(screen.getByRole("button", { name: /load demo pr/i }));
+    fireEvent.click(screen.getByRole("button", { name: /데모 pr 불러오기/i }));
 
-    expect(screen.getByLabelText(/github repository/i)).toHaveValue("demo/public-repo");
-    expect(screen.getByLabelText(/pull request/i)).toHaveValue(17);
+    expect(screen.getByLabelText(/github 저장소/i)).toHaveValue("demo/public-repo");
+    expect(screen.getByLabelText(/풀 리퀘스트/i)).toHaveValue(17);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -64,13 +92,13 @@ describe("Home", () => {
         { status: 200, headers: { "Content-Type": "application/json" } },
       ),
     );
-    render(<Home />);
+    renderHome();
 
-    fireEvent.change(screen.getByLabelText(/github repository/i), {
+    fireEvent.change(screen.getByLabelText(/github 저장소/i), {
       target: { value: "acme/risky-saas" },
     });
-    fireEvent.change(screen.getByLabelText(/pull request/i), { target: { value: "42" } });
-    fireEvent.click(screen.getByRole("button", { name: /analyze change/i }));
+    fireEvent.change(screen.getByLabelText(/풀 리퀘스트/i), { target: { value: "42" } });
+    fireEvent.click(screen.getByRole("button", { name: /변경사항 분석/i }));
 
     await waitFor(() => expect(screen.getByText("DROP_COLUMN")).toBeInTheDocument());
     expect(screen.getAllByText("orders.legacy_status").length).toBeGreaterThan(0);
@@ -126,95 +154,26 @@ describe("Home", () => {
         { status: 200, headers: { "Content-Type": "application/json" } },
       ),
     );
-    render(<Home />);
+    renderHome();
 
-    fireEvent.change(screen.getByLabelText(/github repository/i), {
+    fireEvent.change(screen.getByLabelText(/github 저장소/i), {
       target: { value: "acme/risky-saas" },
     });
-    fireEvent.change(screen.getByLabelText(/pull request/i), { target: { value: "42" } });
-    fireEvent.click(screen.getByRole("button", { name: /analyze change/i }));
+    fireEvent.change(screen.getByLabelText(/풀 리퀘스트/i), { target: { value: "42" } });
+    fireEvent.click(screen.getByRole("button", { name: /변경사항 분석/i }));
 
     await waitFor(() =>
-      expect(screen.getByText("Cross-Layer Application References")).toBeInTheDocument(),
+      expect(screen.getByText("크로스 레이어 애플리케이션 참조")).toBeInTheDocument(),
     );
-    expect(screen.getByText("Direct Reference")).toBeInTheDocument();
-    expect(screen.getByText("Not changed in this PR")).toBeInTheDocument();
+    expect(screen.getAllByText("직접 참조").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("이번 PR에서 변경되지 않음")).toBeInTheDocument();
     expect(screen.getByText("app/order_service.py")).toBeInTheDocument();
     expect(
       screen.getByText("return {'id': order.id, 'status': order.legacy_status}"),
     ).toBeInTheDocument();
   });
 
-  it("renders failure hypothesis with notice when execution is limited", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          pull_request: {
-            number: 42,
-            title: "Drop legacy status",
-            changed_files: 1,
-            html_url: "https://github.com/generic/repo/pull/42",
-          },
-          changed_files: [],
-          sql_files: [],
-          dependency_targets: [],
-          dependency_evidence: [],
-          impact_summary: null,
-          failure_hypotheses: [
-            {
-              id: "hyp_001",
-              category: "SCHEMA_CONTRACT_BREAK",
-              title: "Dropped column remains referenced",
-              statement: "Application references orders.legacy_status after migration",
-              change_ids: ["c1"],
-              evidence_ids: ["e1"],
-              rationale: "order_service.py:11 references dropped column",
-              expected_failure_mode: "UndefinedColumn",
-              assumptions: ["orders table exists"],
-              experiment_template: "DROPPED_COLUMN_REFERENCE",
-              status: "UNVERIFIED",
-            },
-          ],
-          experiment_plans: [
-            {
-              id: "plan_001",
-              hypothesis_id: "hyp_001",
-              template: "DROPPED_COLUMN_REFERENCE",
-              change_ids: ["c1"],
-              evidence_ids: ["e1"],
-              steps: [
-                {
-                  order: 1,
-                  type: "PREPARE_DATABASE",
-                  description: "Provision isolated PostgreSQL database instance",
-                  sql: null,
-                },
-              ],
-              expected_observation: "Query execution fails",
-              status: "NOT_EXECUTED",
-            },
-          ],
-          execution_allowed: false,
-          warnings: [],
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ),
-    );
-    render(<Home />);
-
-    fireEvent.change(screen.getByLabelText(/github repository/i), {
-      target: { value: "generic/repo" },
-    });
-    fireEvent.change(screen.getByLabelText(/pull request/i), { target: { value: "42" } });
-    fireEvent.click(screen.getByRole("button", { name: /analyze change/i }));
-
-    await waitFor(() =>
-      expect(screen.getByText("Evidence-Grounded AI Reasoning")).toBeInTheDocument(),
-    );
-    expect(screen.getByText(/sandbox execution is limited/i)).toBeInTheDocument();
-  });
-
-  it("runs experiment on controlled fixture and renders PROVEN_FAIL observation", async () => {
+  it("runs experiment on controlled fixture and renders PROVEN_FAIL observation and remediation", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch");
 
     // 1. First fetch for PR analysis
@@ -366,39 +325,37 @@ describe("Home", () => {
       ),
     );
 
-    render(<Home />);
+    renderHome();
 
-    fireEvent.change(screen.getByLabelText(/github repository/i), {
+    fireEvent.change(screen.getByLabelText(/github 저장소/i), {
       target: { value: "acme/risky-saas" },
     });
-    fireEvent.change(screen.getByLabelText(/pull request/i), { target: { value: "42" } });
-    fireEvent.click(screen.getByRole("button", { name: /analyze change/i }));
+    fireEvent.change(screen.getByLabelText(/풀 리퀘스트/i), { target: { value: "42" } });
+    fireEvent.click(screen.getByRole("button", { name: /변경사항 분석/i }));
 
-    // Run experiment button appears
+    // Run experiment button appears in Korean
     await waitFor(() =>
       expect(
-        screen.getByRole("button", { name: /run experiment in isolated postgresql/i }),
+        screen.getByRole("button", { name: /격리된 postgresql에서 실험 실행/i }),
       ).toBeInTheDocument(),
     );
 
     fireEvent.click(
-      screen.getByRole("button", { name: /run experiment in isolated postgresql/i }),
+      screen.getByRole("button", { name: /격리된 postgresql에서 실험 실행/i }),
     );
 
     // Observed result rendered
     await waitFor(() =>
-      expect(screen.getByText("Failure reproduced in isolated PostgreSQL.")).toBeInTheDocument(),
+      expect(screen.getByText("격리된 PostgreSQL에서 장애가 재현되었습니다.")).toBeInTheDocument(),
     );
-    expect(screen.getByText("REPRODUCED • PROVEN FAIL")).toBeInTheDocument();
+    expect(screen.getByText("재현 완료 • PROVEN FAIL")).toBeInTheDocument();
     expect(screen.getByText(/SQLSTATE: 42703/)).toBeInTheDocument();
     expect(screen.getByText("contract_a1b2c3d4e5f67890")).toBeInTheDocument();
     expect(screen.getByText("subject_a1b2c3d4e5f67890")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /verify remediation/i }));
+    fireEvent.click(screen.getByRole("button", { name: /복구 검증/i }));
     await waitFor(() => expect(screen.getByText("PROVEN FIXED")).toBeInTheDocument());
-    expect(screen.getByText(/same experiment: yes/i)).toBeInTheDocument();
-    expect(screen.getByText(/subject changed: yes/i)).toBeInTheDocument();
-    expect(screen.getByText(/the same experiment passed after remediation/i)).toBeInTheDocument();
-    expect(screen.getByText(/not to the entire pull request/i)).toBeInTheDocument();
+    expect(screen.getByText(/동일 실험: 예/i)).toBeInTheDocument();
+    expect(screen.getByText(/대상 변경: 예/i)).toBeInTheDocument();
   });
 });

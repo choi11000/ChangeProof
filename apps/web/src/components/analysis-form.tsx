@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import { Translations, useI18n } from "@/lib/i18n";
 
 type FileCategory =
   | "SQL_MIGRATION"
@@ -77,12 +78,22 @@ type FailureHypothesis = {
   expected_failure_mode: string;
   assumptions: string[];
   experiment_template: ExperimentTemplate;
-  status: "UNVERIFIED" | "PROPOSED";
+  status: "PROPOSED" | "UNVERIFIED";
 };
+
+type ExperimentStepType =
+  | "PREPARE_DATABASE"
+  | "LOAD_BASELINE_SCHEMA"
+  | "LOAD_SEED_DATA"
+  | "APPLY_MIGRATION"
+  | "RUN_READ_QUERY"
+  | "RUN_WRITE_MUTATION"
+  | "RUN_CONCURRENT_TRANSACTION"
+  | "CAPTURE_RESULT";
 
 type ExperimentStep = {
   order: number;
-  type: string;
+  type: ExperimentStepType;
   description: string;
   sql?: string | null;
 };
@@ -95,33 +106,17 @@ type ExperimentPlan = {
   evidence_ids: string[];
   steps: ExperimentStep[];
   expected_observation: string;
-  status: "NOT_EXECUTED" | "PLANNED";
+  status: "NOT_EXECUTED" | "PLANNED" | "EXECUTED";
   plan_digest?: string | null;
 };
-
-type ExperimentVerdict =
-  | "PROVEN_FAIL"
-  | "PROVEN_PASS"
-  | "INCONCLUSIVE"
-  | "EXECUTION_ERROR";
-
-type ExperimentStepStatus =
-  | "PENDING"
-  | "RUNNING"
-  | "PASSED"
-  | "FAILED"
-  | "SKIPPED";
 
 type ExperimentStepResult = {
   order: number;
   type: string;
-  status: ExperimentStepStatus;
+  status: "PASSED" | "FAILED" | "SKIPPED";
   duration_ms: number;
   sql_state?: string | null;
-  error_type?: string | null;
   message?: string | null;
-  scalar_value?: string | number | boolean | null;
-  row_count?: number | null;
 };
 
 type ExperimentRun = {
@@ -130,7 +125,7 @@ type ExperimentRun = {
   experiment_contract_digest: string;
   subject_digest: string;
   template: ExperimentTemplate;
-  verdict: ExperimentVerdict;
+  verdict: "PROVEN_FAIL" | "PROVEN_PASS" | "INCONCLUSIVE" | "EXECUTION_ERROR";
   started_at: string;
   finished_at: string;
   step_results: ExperimentStepResult[];
@@ -181,22 +176,26 @@ type AnalysisResult = {
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-function matchKindLabel(kind: DependencyMatchKind): { label: string; className: string } {
+function matchKindLabel(
+  kind: DependencyMatchKind,
+  t: Translations,
+): { label: string; className: string } {
   switch (kind) {
     case "QUALIFIED_REFERENCE":
-      return { label: "Direct Reference", className: "badge badge-direct" };
+      return { label: t.matchDirect, className: "badge badge-direct" };
     case "TABLE_AND_COLUMN_CONTEXT":
-      return { label: "Table Context", className: "badge badge-context" };
+      return { label: t.matchContext, className: "badge badge-context" };
     case "COLUMN_IDENTIFIER":
-      return { label: "Potential Identifier", className: "badge badge-potential" };
+      return { label: t.matchColId, className: "badge badge-potential" };
     case "TABLE_IDENTIFIER":
-      return { label: "Table Identifier", className: "badge badge-direct" };
+      return { label: t.matchTableId, className: "badge badge-direct" };
     default:
       return { label: kind, className: "badge" };
   }
 }
 
 export function AnalysisForm() {
+  const { t } = useI18n();
   const [repository, setRepository] = useState("");
   const [pullRequest, setPullRequest] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -219,11 +218,10 @@ export function AnalysisForm() {
     return {
       sql: files.filter((item) => item.category === "SQL_MIGRATION").length,
       application: files.filter((item) => item.category === "APPLICATION").length,
-      changes:
-        result?.sql_files.reduce(
-          (total, item) => total + (item.analysis?.changes.length ?? 0),
-          0,
-        ) ?? 0,
+      changes: (result?.sql_files ?? []).reduce(
+        (total, file) => total + (file.analysis?.changes.length ?? 0),
+        0,
+      ),
     };
   }, [result]);
 
@@ -270,11 +268,16 @@ export function AnalysisForm() {
       });
       const body = await response.json();
       if (!response.ok) {
-        throw new Error(body.detail ?? "Experiment sandbox execution failed");
+        throw new Error(body.detail ?? "Experiment execution failed");
       }
-      setExperimentRuns((prev) => ({ ...prev, [planId]: body.run }));
-    } catch (err) {
-      setExecutionError(err instanceof Error ? err.message : "Experiment execution failed");
+      setExperimentRuns((prev) => ({
+        ...prev,
+        [planId]: body.run as ExperimentRun,
+      }));
+    } catch (reqError) {
+      setExecutionError(
+        reqError instanceof Error ? reqError.message : "Experiment execution failed",
+      );
     } finally {
       setExecutingPlanId(null);
     }
@@ -287,16 +290,22 @@ export function AnalysisForm() {
       const response = await fetch(`${apiUrl}/api/v1/proofs/remediation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fixture_id: fixtureId }),
+        body: JSON.stringify({
+          fixture_id: fixtureId,
+          experiment_plan_id: planId,
+        }),
       });
       const body = await response.json();
       if (!response.ok) {
         throw new Error(body.detail ?? "Remediation proof failed");
       }
-      setRemediationProofs((previous) => ({ ...previous, [planId]: body.proof }));
-    } catch (requestError) {
+      setRemediationProofs((prev) => ({
+        ...prev,
+        [planId]: body.proof as RemediationProof,
+      }));
+    } catch (reqError) {
       setExecutionError(
-        requestError instanceof Error ? requestError.message : "Remediation proof failed",
+        reqError instanceof Error ? reqError.message : "Remediation proof failed",
       );
     } finally {
       setProvingPlanId(null);
@@ -307,30 +316,30 @@ export function AnalysisForm() {
     <>
       <form className="analysis-card" onSubmit={submit}>
         <div className="field wide">
-          <label htmlFor="repository">GitHub repository</label>
+          <label htmlFor="repository">{t.repoLabel}</label>
           <input
             id="repository"
             onChange={(event) => setRepository(event.target.value)}
-            placeholder="https://github.com/acme/risky-saas"
+            placeholder={t.repoPlaceholder}
             required
             type="text"
             value={repository}
           />
         </div>
         <div className="field">
-          <label htmlFor="pr">Pull request</label>
+          <label htmlFor="pr">{t.prLabel}</label>
           <input
             id="pr"
             min="1"
             onChange={(event) => setPullRequest(event.target.value)}
-            placeholder="42"
+            placeholder={t.prPlaceholder}
             required
             type="number"
             value={pullRequest}
           />
         </div>
         <button disabled={loading} type="submit">
-          {loading ? "Analyzing…" : "Analyze change"} <span>→</span>
+          {loading ? t.analyzingBtn : t.analyzeBtn} <span>→</span>
         </button>
         {demoConfigured && (
           <div className="demo-load-group">
@@ -343,27 +352,49 @@ export function AnalysisForm() {
               }}
               type="button"
             >
-              Load demo PR
+              {t.loadDemoBtn}
             </button>
-            <span className="demo-hint">Try prepared risky SaaS migration</span>
+            <span className="demo-hint">{t.demoHint}</span>
           </div>
         )}
       </form>
 
-      {error && <p className="analysis-error" role="alert">{error}</p>}
-      {executionError && <p className="analysis-error" role="alert">{executionError}</p>}
+      {error && (
+        <p className="analysis-error" role="alert">
+          {error}
+        </p>
+      )}
+      {executionError && (
+        <p className="analysis-error" role="alert">
+          {executionError}
+        </p>
+      )}
 
       {result && (
         <section className="analysis-result" aria-label="Pull request analysis">
           <div className="result-heading">
-            <p className="eyebrow">STRUCTURED CHANGE FACTS</p>
-            <h2>PR #{result.pull_request.number} — {result.pull_request.title}</h2>
+            <p className="eyebrow">{t.changeFactsEyebrow}</p>
+            <h2>
+              PR #{result.pull_request.number} — {result.pull_request.title}
+            </h2>
           </div>
           <dl className="result-counts">
-            <div><dt>Changed files</dt><dd>{result.pull_request.changed_files}</dd></div>
-            <div><dt>SQL migrations</dt><dd>{counts.sql}</dd></div>
-            <div><dt>Application files</dt><dd>{counts.application}</dd></div>
-            <div><dt>DB changes</dt><dd>{counts.changes}</dd></div>
+            <div>
+              <dt>{t.changedFiles}</dt>
+              <dd>{result.pull_request.changed_files}</dd>
+            </div>
+            <div>
+              <dt>{t.sqlMigrations}</dt>
+              <dd>{counts.sql}</dd>
+            </div>
+            <div>
+              <dt>{t.appFiles}</dt>
+              <dd>{counts.application}</dd>
+            </div>
+            <div>
+              <dt>{t.dbChanges}</dt>
+              <dd>{counts.changes}</dd>
+            </div>
           </dl>
           <div className="change-list">
             {result.sql_files.map((file) => (
@@ -386,32 +417,30 @@ export function AnalysisForm() {
           <div className="evidence-section" aria-label="Impact Surface">
             <div className="evidence-heading">
               <div>
-                <p className="eyebrow">IMPACT SURFACE</p>
-                <h3>Cross-Layer Application References</h3>
+                <p className="eyebrow">{t.impactEyebrow}</p>
+                <h3>{t.impactHeading}</h3>
               </div>
               {result.impact_summary && !result.impact_summary.scan_complete && (
-                <span className="badge badge-warning">
-                  Limited Scan (Incomplete)
-                </span>
+                <span className="badge badge-warning">{t.impactIncomplete}</span>
               )}
             </div>
 
             {result.impact_summary && (
               <dl className="result-counts">
                 <div>
-                  <dt>Target entities</dt>
+                  <dt>{t.targetEntities}</dt>
                   <dd>{result.impact_summary.targets}</dd>
                 </div>
                 <div>
-                  <dt>App files affected</dt>
+                  <dt>{t.appFilesAffected}</dt>
                   <dd>{result.impact_summary.application_files_with_references}</dd>
                 </div>
                 <div>
-                  <dt>Direct references</dt>
+                  <dt>{t.directReferences}</dt>
                   <dd>{result.impact_summary.qualified_references}</dd>
                 </div>
                 <div>
-                  <dt>Potential references</dt>
+                  <dt>{t.potentialReferences}</dt>
                   <dd>
                     {result.impact_summary.contextual_references +
                       result.impact_summary.identifier_references}
@@ -425,19 +454,16 @@ export function AnalysisForm() {
           <div className="evidence-section" aria-label="Dependency Evidence">
             <div className="evidence-heading">
               <div>
-                <p className="eyebrow">DEPENDENCY EVIDENCE</p>
-                <h3>Deterministic Source Code Matches</h3>
+                <p className="eyebrow">{t.evidenceEyebrow}</p>
+                <h3>{t.evidenceHeading}</h3>
               </div>
             </div>
 
             {result.dependency_evidence && result.dependency_evidence.length > 0 ? (
               <div className="evidence-list">
                 {result.dependency_evidence.map((evidence) => {
-                  const matchMeta = matchKindLabel(evidence.match_kind);
-                  const targetLabel = [
-                    evidence.target.table,
-                    evidence.target.column,
-                  ]
+                  const matchMeta = matchKindLabel(evidence.match_kind, t);
+                  const targetLabel = [evidence.target.table, evidence.target.column]
                     .filter(Boolean)
                     .join(".");
 
@@ -451,9 +477,9 @@ export function AnalysisForm() {
                           <span className="evidence-target">{targetLabel}</span>
                           <span className={matchMeta.className}>{matchMeta.label}</span>
                           {evidence.changed_in_pull_request ? (
-                            <span className="badge badge-changed">Changed in this PR</span>
+                            <span className="badge badge-changed">{t.badgeChangedInPr}</span>
                           ) : (
-                            <span className="badge badge-unchanged">Not changed in this PR</span>
+                            <span className="badge badge-unchanged">{t.badgeNotChangedInPr}</span>
                           )}
                         </div>
                       </div>
@@ -467,8 +493,8 @@ export function AnalysisForm() {
             ) : (
               <div className="empty-state">
                 {result.impact_summary?.scan_complete
-                  ? "No source references found in scanned application files."
-                  : "No references found in scanned subset. Source analysis was limited."}
+                  ? t.noEvidenceComplete
+                  : t.noEvidenceIncomplete}
               </div>
             )}
           </div>
@@ -479,10 +505,10 @@ export function AnalysisForm() {
           <div className="evidence-section" aria-label="Failure Hypotheses">
             <div className="evidence-heading">
               <div>
-                <p className="eyebrow">FAILURE HYPOTHESES &amp; EXPERIMENT PLANNING</p>
-                <h3>Evidence-Grounded AI Reasoning</h3>
+                <p className="eyebrow">{t.hypothesesEyebrow}</p>
+                <h3>{t.hypothesesHeading}</h3>
               </div>
-              <span className="badge badge-unverified">UNVERIFIED PROPOSAL</span>
+              <span className="badge badge-unverified">{t.unverifiedProposal}</span>
             </div>
 
             {result.failure_hypotheses && result.failure_hypotheses.length > 0 ? (
@@ -499,17 +525,20 @@ export function AnalysisForm() {
                   return (
                     <article key={hypothesis.id} className="hypothesis-card">
                       <div className="hypothesis-header">
-                        <span className="badge badge-hypothesis">HYPOTHESIS • {hypothesis.status}</span>
+                        <span className="badge badge-hypothesis">
+                          {t.hypothesisBadge} {hypothesis.status}
+                        </span>
                         <span className="hypothesis-category">{hypothesis.category}</span>
                       </div>
                       <h4>{hypothesis.title}</h4>
                       <p className="hypothesis-statement">{hypothesis.statement}</p>
                       <div className="hypothesis-meta">
                         <div>
-                          <strong>Rationale:</strong> {hypothesis.rationale}
+                          <strong>{t.rationaleLabel}</strong> {hypothesis.rationale}
                         </div>
                         <div>
-                          <strong>Expected Failure:</strong> <code>{hypothesis.expected_failure_mode}</code>
+                          <strong>{t.expectedFailureLabel}</strong>{" "}
+                          <code>{hypothesis.expected_failure_mode}</code>
                         </div>
                       </div>
 
@@ -518,16 +547,19 @@ export function AnalysisForm() {
                           <div className="plan-header">
                             <div>
                               <span className="badge badge-plan">
-                                PROPOSED EXPERIMENT • {matchingPlan.status}
+                                {t.proposedExperimentBadge} {matchingPlan.status}
                               </span>
-                              <h5>Template: {matchingPlan.template}</h5>
+                              <h5>
+                                {t.templateLabel} {matchingPlan.template}
+                              </h5>
                             </div>
                             <span className="plan-status-notice">
-                              {executionRun ? "Executed in sandbox" : "Not executed yet"}
+                              {executionRun ? t.executedInSandbox : t.notExecutedYet}
                             </span>
                           </div>
                           <p className="plan-observation">
-                            <strong>Expected observation:</strong> {matchingPlan.expected_observation}
+                            <strong>{t.expectedObservationLabel}</strong>{" "}
+                            {matchingPlan.expected_observation}
                           </p>
                           <ol className="plan-steps">
                             {matchingPlan.steps.map((step) => (
@@ -554,13 +586,12 @@ export function AnalysisForm() {
                                   }
                                 >
                                   {executingPlanId === matchingPlan.id
-                                    ? "Reproducing failure in PostgreSQL..."
-                                    : "Run experiment in isolated PostgreSQL →"}
+                                    ? t.runningExperimentBtn
+                                    : t.runExperimentBtn}
                                 </button>
                               ) : (
                                 <p className="sandbox-limited-notice">
-                                  {result.execution_notice ||
-                                    "Sandbox execution is limited to controlled demo fixtures in this MVP."}
+                                  {result.execution_notice || t.sandboxNoticeDefault}
                                 </p>
                               )}
                             </div>
@@ -583,9 +614,9 @@ export function AnalysisForm() {
                                     }`}
                                   >
                                     {executionRun.verdict === "PROVEN_FAIL"
-                                      ? "REPRODUCED • PROVEN FAIL"
+                                      ? t.reproducedFailBadge
                                       : executionRun.verdict === "PROVEN_PASS"
-                                        ? "NOT REPRODUCED • PROVEN PASS"
+                                        ? t.notReproducedPassBadge
                                         : executionRun.verdict}
                                   </span>
                                 </div>
@@ -601,18 +632,16 @@ export function AnalysisForm() {
                                 }`}
                               >
                                 {executionRun.verdict === "PROVEN_FAIL"
-                                  ? "Failure reproduced in isolated PostgreSQL."
+                                  ? t.reproducedFailHeadline
                                   : executionRun.verdict === "PROVEN_PASS"
-                                    ? "This experiment completed without the expected failure."
-                                    : "Experiment executed with non-conclusive observations."}
+                                    ? t.notReproducedPassHeadline
+                                    : t.inconclusiveHeadline}
                               </div>
 
                               <p className="run-summary">
                                 {executionRun.summary}
                                 {executionRun.verdict === "PROVEN_PASS" && (
-                                  <span className="run-subnote">
-                                    This verdict applies only to this experiment, not to the entire pull request.
-                                  </span>
+                                  <span className="run-subnote">{t.passSubnote}</span>
                                 )}
                               </p>
 
@@ -623,7 +652,10 @@ export function AnalysisForm() {
                                     className={`step-result-item status-${step.status.toLowerCase()}`}
                                   >
                                     <div>
-                                      <strong>Step {step.order}:</strong> {step.type}
+                                      <strong>
+                                        {t.stepLabel} {step.order}:
+                                      </strong>{" "}
+                                      {step.type}
                                     </div>
                                     <div>
                                       <span>{step.status}</span> ({step.duration_ms}ms)
@@ -638,80 +670,105 @@ export function AnalysisForm() {
                               </ul>
 
                               <div className="plan-digest-footer">
-                                Experiment Contract: <code>{executionRun.experiment_contract_digest}</code>
+                                {t.experimentContractLabel}{" "}
+                                <code>{executionRun.experiment_contract_digest}</code>
                                 <br />
-                                Subject: <code>{executionRun.subject_digest}</code>
+                                {t.subjectLabel} <code>{executionRun.subject_digest}</code>
                                 <br />
-                                Cleanup: {executionRun.cleanup_succeeded === true ? "SUCCEEDED" : executionRun.cleanup_succeeded === false ? "FAILED" : "UNKNOWN"}
+                                {t.cleanupLabel}{" "}
+                                {executionRun.cleanup_succeeded === true
+                                  ? t.cleanupSucceeded
+                                  : executionRun.cleanup_succeeded === false
+                                    ? t.cleanupFailed
+                                    : t.cleanupUnknown}
                               </div>
                             </div>
                           )}
 
-                          {executionRun && result.execution_allowed && result.controlled_fixture_id && (
-                            <div className="remediation-card" aria-label="Remediation">
-                              <p className="eyebrow">REMEDIATION</p>
-                              {executionRun.verdict === "PROVEN_PASS" ? (
-                                <p>No remediation required for this experiment.</p>
-                              ) : executionRun.verdict === "PROVEN_FAIL" ? (
-                                <>
-                                  <h5>Deterministic compatibility remediation</h5>
-                                  <p>
-                                    This allowlisted remediation will be validated against the same experiment.
-                                  </p>
-                                  {!remediationProof && (
-                                    <button
-                                      type="button"
-                                      className="btn-run-experiment"
-                                      disabled={provingPlanId === matchingPlan.id}
-                                      onClick={() =>
-                                        verifyRemediation(
-                                          result.controlled_fixture_id!,
-                                          matchingPlan.id,
-                                        )
-                                      }
-                                    >
-                                      {provingPlanId === matchingPlan.id
-                                        ? "Running authoritative before and after experiments..."
-                                        : "Verify remediation →"}
-                                    </button>
-                                  )}
-                                </>
-                              ) : (
-                                <p>Remediation verification requires a conclusive reproduced failure.</p>
-                              )}
+                          {executionRun &&
+                            result.execution_allowed &&
+                            result.controlled_fixture_id && (
+                              <div className="remediation-card" aria-label="Remediation">
+                                <p className="eyebrow">{t.remediationEyebrow}</p>
+                                {executionRun.verdict === "PROVEN_PASS" ? (
+                                  <p>{t.noRemediationNeeded}</p>
+                                ) : executionRun.verdict === "PROVEN_FAIL" ? (
+                                  <>
+                                    <h5>{t.remediationHeading}</h5>
+                                    <p>{t.remediationDesc}</p>
+                                    {!remediationProof && (
+                                      <button
+                                        type="button"
+                                        className="btn-run-experiment"
+                                        disabled={provingPlanId === matchingPlan.id}
+                                        onClick={() =>
+                                          verifyRemediation(
+                                            result.controlled_fixture_id!,
+                                            matchingPlan.id,
+                                          )
+                                        }
+                                      >
+                                        {provingPlanId === matchingPlan.id
+                                          ? t.verifyingRemediationBtn
+                                          : t.verifyRemediationBtn}
+                                      </button>
+                                    )}
+                                  </>
+                                ) : (
+                                  <p>{t.remediationRequiresFailure}</p>
+                                )}
 
-                              {remediationProof && (
-                                <div className="remediation-proof" aria-label="Remediation Proof">
-                                  <span className={`badge ${remediationProof.verdict === "PROVEN_FIXED" ? "badge-pass" : "badge-inconclusive"}`}>
-                                    {remediationProof.verdict.replace("_", " ")}
-                                  </span>
-                                  <h5>{remediationProof.description}</h5>
-                                  <div className="proof-comparison">
-                                    <div>
-                                      <strong>Before</strong>
-                                      <span>{remediationProof.before.verdict.replace("_", " ")}</span>
-                                      <code>
-                                        SQLSTATE {remediationProof.before.step_results.find((step) => step.sql_state)?.sql_state ?? "N/A"}
-                                      </code>
+                                {remediationProof && (
+                                  <div
+                                    className="remediation-proof"
+                                    aria-label="Remediation Proof"
+                                  >
+                                    <span
+                                      className={`badge ${
+                                        remediationProof.verdict === "PROVEN_FIXED"
+                                          ? "badge-pass"
+                                          : "badge-inconclusive"
+                                      }`}
+                                    >
+                                      {remediationProof.verdict.replace("_", " ")}
+                                    </span>
+                                    <h5>{remediationProof.description}</h5>
+                                    <div className="proof-comparison">
+                                      <div>
+                                        <strong>{t.beforeLabel}</strong>
+                                        <span>{remediationProof.before.verdict.replace("_", " ")}</span>
+                                        <code>
+                                          SQLSTATE{" "}
+                                          {remediationProof.before.step_results.find(
+                                            (step) => step.sql_state,
+                                          )?.sql_state ?? "N/A"}
+                                        </code>
+                                      </div>
+                                      <div>
+                                        <strong>{t.sameExperimentLabel}</strong>
+                                        <span>
+                                          {t.contractLabel}{" "}
+                                          {remediationProof.experiment_contract_digest.slice(0, 20)}
+                                          ...
+                                        </span>
+                                      </div>
+                                      <div>
+                                        <strong>{t.afterLabel}</strong>
+                                        <span>{remediationProof.after.verdict.replace("_", " ")}</span>
+                                      </div>
                                     </div>
-                                    <div>
-                                      <strong>Same experiment</strong>
-                                      <span>Contract: {remediationProof.experiment_contract_digest.slice(0, 20)}...</span>
-                                    </div>
-                                    <div>
-                                      <strong>After</strong>
-                                      <span>{remediationProof.after.verdict.replace("_", " ")}</span>
-                                    </div>
+                                    <p className="proof-invariants">
+                                      {t.invariantSameExp}{" "}
+                                      {remediationProof.same_experiment ? t.yes : t.no} ·{" "}
+                                      {t.invariantSubjectChanged}{" "}
+                                      {remediationProof.subject_changed ? t.yes : t.no}
+                                    </p>
+                                    <p className="proof-demo-message">{remediationProof.summary}</p>
+                                    <p className="run-subnote">{remediationProof.scope_notice}</p>
                                   </div>
-                                  <p className="proof-invariants">
-                                    Same experiment: {remediationProof.same_experiment ? "YES" : "NO"} · Subject changed: {remediationProof.subject_changed ? "YES" : "NO"}
-                                  </p>
-                                  <p className="proof-demo-message">{remediationProof.summary}</p>
-                                  <p className="run-subnote">{remediationProof.scope_notice}</p>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                                )}
+                              </div>
+                            )}
                         </div>
                       )}
                     </article>
@@ -719,9 +776,7 @@ export function AnalysisForm() {
                 })}
               </div>
             ) : (
-              <div className="empty-state">
-                No evidence-grounded failure hypothesis generated for this change.
-              </div>
+              <div className="empty-state">{t.noHypothesisGenerated}</div>
             )}
           </div>
         </section>
