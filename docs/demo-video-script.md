@@ -33,7 +33,7 @@
   * 화면 스크롤: **'구조화된 변경 팩트'** (`DROP_COLUMN orders.legacy_status`).
   * **'영향 범위 및 의존성 증거'** 카드 클로즈업: `app/order_service.py:11`에서 `return {'id': order.id, 'status': order.legacy_status}` 코드가 하이라이트된 장면. 배지: `직접 참조`, `이번 PR에서 변경되지 않음`.
 * **내레이션 (Voiceover)**:
-  > "보시다시피 마이그레이션 파일에서는 컬럼을 지웠지만, 이번 PR에서 수정되지 않은 `order_service.py` 11번째 줄에는 여전히 `legacy_status`를 직접 참조하는 코드가 남아있습니다. 정규표현식이 아닌 완벽한 결정론적 증거입니다."
+  > "보시다시피 마이그레이션 파일에서는 컬럼을 지웠지만, 이번 PR에서 수정되지 않은 `order_service.py` 11번째 줄에는 여전히 `legacy_status`를 직접 참조하는 코드가 남아있습니다. 결정론적 분석으로 추출한 직접 참조 증거입니다."
 
 ---
 
@@ -56,7 +56,7 @@
     * 5단계 실패: `단계 5: 조회 쿼리 실행 - 실패 (FAILED)`.
     * 구체적 에러 포착: `SQLSTATE: 42703 • column "legacy_status" does not exist`.
 * **내레이션 (Voiceover)**:
-  > "이제 버튼 한 번으로, 수초 내에 프로비저닝된 격리 PostgreSQL 샌드박스에서 변경사항을 직접 실행합니다. 보시는 것처럼 실제 PostgreSQL 엔진이 `SQLSTATE 42703 (undefined_column)` 오류를 뱉어내며, 장애가 배포 전에 100% 명백하게 재현되었습니다."
+  > "이제 버튼 한 번으로, 수초 내에 프로비저닝된 격리 PostgreSQL 샌드박스에서 변경사항을 직접 실행합니다. 실제 PostgreSQL 엔진이 `SQLSTATE 42703 (undefined_column)`을 반환했고, 이 controlled experiment에서 예상한 실패가 재현되어 결정론적 verifier가 `PROVEN_FAIL`을 발급합니다."
 
 ---
 
@@ -68,14 +68,28 @@
   * Before (`PROVEN FAIL`, `42703`) vs After (`PROVEN PASS`).
   * 동일 실험 계약(`contract_...`) 일치 확인.
 * **내레이션 (Voiceover)**:
-  > "장애를 재현했다면 고칠 수 있어야 합니다. 호환성 복구 마이그레이션을 적용한 후, 완전히 동일한 실험 계약을 다시 실행하여 마침내 `PROVEN_FIXED`로 결함이 완벽히 해결되었음을 증명합니다."
+  > "실패를 재현했다면 수정 후 같은 조건에서 다시 확인해야 합니다. 호환성 복구 마이그레이션으로 subject만 변경하고 동일한 실험 계약을 재실행합니다. 실패가 사라져 `PROVEN_PASS`가 관찰될 때, 이 실험 쌍에 대해 `PROVEN_FIXED`를 발급합니다. 이 proof는 PR 전체나 프로덕션 시스템의 안전성을 뜻하지 않습니다."
 
 ---
 
 ### [01:45 – 02:00] 신뢰 아키텍처 요약 및 엔딩
 * **화면**:
   * 핵심 신뢰 아키텍처 인포그래픽:
-    * `DETERMINISTIC FACT` $\rightarrow$ `AI HYPOTHESIS` $\rightarrow$ `REAL POSTGRESQL` $\rightarrow$ `PROVEN VERDICT`
+    * `DETERMINISTIC ANALYSIS = FACT` $\rightarrow$ `OPENAI = HYPOTHESIS` $\rightarrow$ `POSTGRESQL = OBSERVATION` $\rightarrow$ `DETERMINISTIC VERIFIER = VERDICT`
   * 로고 및 공식 슬로건 화면.
 * **내레이션 (Voiceover)**:
-  > "팩트는 결정론으로, 가설은 AI로, 판정은 실제 데이터베이스로 내립니다. 배포 전에 실패를 예측하지 마세요. 직접 재현하고 증명하세요. ChangeProof입니다."
+  > "팩트는 결정론적 분석에서, 가설은 OpenAI에서, 관측은 PostgreSQL에서, verdict는 결정론적 verifier에서 나옵니다. 변경 subject만 바꾸고 동일한 실험을 재실행해 실패가 사라졌을 때 그 실험 범위의 proof가 완성됩니다. ChangeProof입니다."
+
+> This proof applies to this controlled experiment, not to the entire pull request or production system.
+
+```text
+DETERMINISTIC ANALYSIS = FACT
+OPENAI = HYPOTHESIS
+POSTGRESQL = OBSERVATION
+DETERMINISTIC VERIFIER = VERDICT
+
+SAME EXPERIMENT
+- CHANGED SUBJECT
+- FAIL → PASS
+= PROOF
+```

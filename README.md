@@ -54,9 +54,9 @@ Because diff-only reviews do not inspect unchanged application files, and specul
 ChangeProof replaces speculation with **reproduction**:
 
 1. **Deterministic Fact Extraction**: Parses SQL migrations with an AST parser (`sqlglot`) and scans the entire repository tree at the PR commit (`head_sha`) to discover references to dropped columns or tables.
-2. **Evidence-Grounded AI Planning**: Uses OpenAI Structured Outputs with prompt-injection isolation to synthesize verified facts and evidence into concrete failure hypotheses and executable 6-step experiment plans. Hypotheses remain strictly `UNVERIFIED` proposals.
+2. **Evidence-Grounded AI Planning**: Uses OpenAI Structured Outputs to propose concrete failure hypotheses and an allowlisted experiment template from verified facts and evidence. Hypotheses remain strictly `UNVERIFIED`; a deterministic compiler creates the executable 6-step plan.
 3. **Ephemeral PostgreSQL Execution**: Spawns an isolated ephemeral schema (`cp_run_<hex12>`), applies baseline schemas, loads seed data, applies the PR migration, and executes the dependent query. It captures physical database engine errors (`SQLSTATE 42703`) $\rightarrow$ **`PROVEN_FAIL`**.
-4. **Same-Experiment Remediation Proof**: Applies a backward-compatible remediation migration and re-executes the identical experiment contract digest (`contract_...`). Verifying that it passes (`PROVEN_PASS`) provides mathematical proof that the bug is resolved $\rightarrow$ **`PROVEN_FIXED`**.
+4. **Same-Experiment Remediation Proof**: Applies a backward-compatible remediation migration and re-executes the identical experiment contract digest (`contract_...`) against a changed subject. When the previously observed failure disappears (`PROVEN_PASS`), the deterministic verifier issues **`PROVEN_FIXED`** for that before/after experiment pair.
 
 ---
 
@@ -66,10 +66,26 @@ ChangeProof replaces speculation with **reproduction**:
 | :--- | :--- | :--- | :--- | :--- |
 | **1. FACT** | SQL parsing & source dependency discovery | `sqlglot` AST & file indexer | 100% Deterministic | `ChangeFact`, `DependencyEvidence` |
 | **2. HYPOTHESIS** | Failure symptom & experiment plan mapping | OpenAI `gpt-4o-mini` (Structured Outputs) | Bounded AI reasoning | `FailureHypothesis` (`UNVERIFIED`) |
-| **3. OBSERVATION** | Sandbox migration & query execution | Ephemeral PostgreSQL 17 (`asyncpg`) | Real DB Engine | `SQLSTATE 42703`, Step traces |
+| **3. OBSERVATION** | Sandbox migration & query execution | Ephemeral PostgreSQL 17 (`psycopg`) | Real DB Engine | `SQLSTATE 42703`, Step traces |
 | **4. VERDICT & PROOF** | Contract digest & invariance verification | Deterministic proof verifier | 100% Deterministic | `PROVEN_FAIL`, `PROVEN_FIXED` |
 
-> **Crucial Guarantee**: AI **never** decides whether a change is safe. AI **never** executes arbitrary SQL or shell commands. Only real PostgreSQL observation determines the verdict.
+> **Crucial Boundary**: AI **never** decides whether a change is safe and never executes arbitrary SQL or shell commands. PostgreSQL supplies observations; the deterministic verifier alone issues verdicts.
+
+```text
+DETERMINISTIC ANALYSIS = FACT
+OPENAI = HYPOTHESIS
+POSTGRESQL = OBSERVATION
+DETERMINISTIC VERIFIER = VERDICT
+
+SAME EXPERIMENT
+- CHANGED SUBJECT
+- FAIL → PASS
+= PROOF
+```
+
+`PROVEN_PASS` means the expected failure was not observed in that controlled experiment. It does not establish that the entire pull request or production system is safe.
+
+> This proof applies to this controlled experiment, not to the entire pull request or production system.
 
 ---
 
@@ -121,7 +137,7 @@ flowchart TD
 
 ## 💻 Local Development
 
-Prerequisites: Docker Desktop with Compose v2, Python 3.12, Node.js 20+.
+Prerequisites: Docker Desktop with Compose v2, Python 3.11+, Node.js 20+.
 
 ```bash
 # 1. Clone repository
