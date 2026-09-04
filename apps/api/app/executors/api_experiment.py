@@ -24,9 +24,7 @@ class ApiExperimentExecutor:
         variant: str = "changed",
     ) -> list[ExperimentStepResult]:
         step_results: list[ExperimentStepResult] = []
-        payload = (
-            fixture.remediated_payload if variant == "remediated" else fixture.changed_payload
-        )
+        payload = fixture.remediated_payload if variant == "remediated" else fixture.changed_payload
 
         # Step 1: Prepare in-process API environment
         t0 = time.perf_counter()
@@ -55,6 +53,7 @@ class ApiExperimentExecutor:
         http_status: int = 0
         try:
             from starlette.testclient import TestClient
+
             with TestClient(app) as client:
                 response = client.request(fixture.method, fixture.path)
                 http_status = response.status_code

@@ -71,6 +71,8 @@ class PlanningContextBudgeter:
                         operation=item.api_change.change_type.value,
                         table=item.api_change.path,
                         column=item.api_change.field_name,
+                        endpoint=item.api_change.path,
+                        domain="API",
                     )
                 )
             elif item.performance_change:
@@ -80,6 +82,9 @@ class PlanningContextBudgeter:
                         operation=item.performance_change.change_type.value,
                         table=item.performance_change.endpoint,
                         column=item.performance_change.downstream_symbol,
+                        endpoint=item.performance_change.endpoint,
+                        downstream_symbol=item.performance_change.downstream_symbol,
+                        domain="PERFORMANCE",
                     )
                 )
 
@@ -105,9 +110,7 @@ class PlanningContextBudgeter:
             stats=stats,
         )
 
-    def _select_evidence(
-        self, evidence: list[DependencyEvidence]
-    ) -> list[DependencyEvidence]:
+    def _select_evidence(self, evidence: list[DependencyEvidence]) -> list[DependencyEvidence]:
         if not evidence:
             return []
         ranked = sorted(evidence, key=self._rank)
@@ -128,9 +131,7 @@ class PlanningContextBudgeter:
             if not progress:
                 break
         selected_ids = {item.id for item in selected}
-        selected.extend(
-            item for item in ranked if item.id not in selected_ids
-        )
+        selected.extend(item for item in ranked if item.id not in selected_ids)
         return selected[: self.max_evidence]
 
     @staticmethod

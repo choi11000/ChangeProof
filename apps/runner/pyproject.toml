@@ -9,6 +9,11 @@ dependencies = [
     "pydantic>=2.7.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
 [project.scripts]
 changeproof = "changeproof_runner.cli:main"
 

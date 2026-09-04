@@ -2,7 +2,14 @@ import ast
 import logging
 from typing import Any
 
-from app.schemas.dependency import ChangeFact, DependencyEvidence, DependencyMatchKind, DependencyTarget, DependencyTargetType, SourceScope
+from app.schemas.dependency import (
+    ChangeFact,
+    DependencyEvidence,
+    DependencyMatchKind,
+    DependencyTarget,
+    DependencyTargetType,
+    SourceScope,
+)
 from app.schemas.performance import PerformanceChange, PerformanceChangeType
 
 logger = logging.getLogger(__name__)
@@ -95,7 +102,7 @@ class RouteExternalCallVisitor(ast.NodeVisitor):
 
 
 class PerformanceAnalyzer:
-    """Deterministic AST analyzer detecting downstream external dependencies on hot request paths."""
+    """Deterministic AST analyzer detecting downstream external calls on request paths."""
 
     def analyze_source(
         self,
@@ -118,18 +125,23 @@ class PerformanceAnalyzer:
 
         for finding in visitor.findings:
             endpoint_str = f"{finding['method']} {finding['path']}"
-            stable_id = f"performance:{finding['method']}:{finding['path']}:external:{finding['downstream_symbol']}"
-            evidence_id = f"evidence_perf_{finding['line']}_{finding['downstream_symbol'].replace('.', '_')}"
+            method = finding["method"]
+            path = finding["path"]
+            symbol = finding["downstream_symbol"]
+            stable_id = f"performance:{method}:{path}:external:{symbol}"
+            evidence_id = (
+                f"evidence_perf_{finding['line']}_{symbol.replace('.', '_')}"
+            )
 
             perf_change = PerformanceChange(
                 change_type=PerformanceChangeType.EXTERNAL_CALL_ADDED_TO_REQUEST_PATH,
                 endpoint=endpoint_str,
-                method=finding["method"],
+                method=method,
                 source_file=file_path,
                 line=finding["line"],
-                downstream_symbol=finding["downstream_symbol"],
+                downstream_symbol=symbol,
                 changed_in_pull_request=changed_in_pull_request,
-                context_snippet=f"{finding['function_name']}() calls {finding['downstream_symbol']}",
+                context_snippet=f"{finding['function_name']}() calls {symbol}",
             )
 
             fact = ChangeFact(
@@ -156,6 +168,90 @@ class PerformanceAnalyzer:
                 excerpt=f"{endpoint_str} -> {finding['downstream_symbol']}",
                 source_scope=SourceScope.APPLICATION,
                 changed_in_pull_request=changed_in_pull_request,
+            )
+            evidences.append(evidence)
+        return facts, evidences
+
+    def analyze_change(
+        self,
+        base_source: str | None,
+        head_source: str,
+        file_path: str = "app/dashboard.py",
+    ) -> tuple[list[ChangeFact], list[DependencyEvidence]]:
+        """Analyze difference between base and head to identify genuinely ADDED external calls."""
+        base_call_keys = set()
+        if base_source:
+            try:
+                base_tree = ast.parse(base_source, filename=file_path)
+                base_visitor = RouteExternalCallVisitor(file_path)
+                base_visitor.visit(base_tree)
+                for f in base_visitor.findings:
+                    base_call_keys.add((f["method"], f["path"], f["downstream_symbol"]))
+            except SyntaxError:
+                pass
+
+        try:
+            head_tree = ast.parse(head_source, filename=file_path)
+        except SyntaxError as e:
+            logger.warning("Failed to parse %s for performance analysis: %s", file_path, e)
+            return [], []
+
+        head_visitor = RouteExternalCallVisitor(file_path)
+        head_visitor.visit(head_tree)
+
+        facts: list[ChangeFact] = []
+        evidences: list[DependencyEvidence] = []
+
+        for finding in head_visitor.findings:
+            key = (finding["method"], finding["path"], finding["downstream_symbol"])
+            # Change awareness: Only emit fact if call did NOT exist in base
+            if key in base_call_keys:
+                continue
+
+            endpoint_str = f"{finding['method']} {finding['path']}"
+            method = finding["method"]
+            path = finding["path"]
+            symbol = finding["downstream_symbol"]
+            stable_id = f"performance:{method}:{path}:external:{symbol}"
+            evidence_id = (
+                f"evidence_perf_{finding['line']}_{symbol.replace('.', '_')}"
+            )
+
+            perf_change = PerformanceChange(
+                change_type=PerformanceChangeType.EXTERNAL_CALL_ADDED_TO_REQUEST_PATH,
+                endpoint=endpoint_str,
+                method=method,
+                source_file=file_path,
+                line=finding["line"],
+                downstream_symbol=symbol,
+                changed_in_pull_request=True,
+                context_snippet=f"{finding['function_name']}() calls {symbol}",
+            )
+
+            fact = ChangeFact(
+                id=stable_id,
+                domain="PERFORMANCE",
+                sql_file_path=file_path,
+                performance_change=perf_change,
+            )
+            facts.append(fact)
+
+            target = DependencyTarget(
+                type=DependencyTargetType.PERFORMANCE_ENDPOINT,
+                path=finding["path"],
+                table="",
+                change_ids=[stable_id],
+            )
+
+            evidence = DependencyEvidence(
+                id=evidence_id,
+                target=target,
+                path=file_path,
+                line=finding["line"],
+                match_kind=DependencyMatchKind.QUALIFIED_REFERENCE,
+                excerpt=f"{endpoint_str} -> {finding['downstream_symbol']}",
+                source_scope=SourceScope.APPLICATION,
+                changed_in_pull_request=True,
             )
             evidences.append(evidence)
 

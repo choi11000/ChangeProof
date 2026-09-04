@@ -80,9 +80,7 @@ def test_openai_rate_limit_mapping() -> None:
 def test_openai_timeout_mapping() -> None:
     mock_openai = MagicMock()
     request = httpx.Request("POST", "https://api.openai.com/v1/responses")
-    mock_openai.responses.parse = AsyncMock(
-        side_effect=APITimeoutError(request=request)
-    )
+    mock_openai.responses.parse = AsyncMock(side_effect=APITimeoutError(request=request))
 
     client = OpenAIHypothesisClient(client=mock_openai)
 
@@ -93,9 +91,7 @@ def test_openai_timeout_mapping() -> None:
 def test_openai_connection_error_mapping() -> None:
     mock_openai = MagicMock()
     request = httpx.Request("POST", "https://api.openai.com/v1/responses")
-    mock_openai.responses.parse = AsyncMock(
-        side_effect=APIConnectionError(request=request)
-    )
+    mock_openai.responses.parse = AsyncMock(side_effect=APIConnectionError(request=request))
 
     client = OpenAIHypothesisClient(client=mock_openai)
 

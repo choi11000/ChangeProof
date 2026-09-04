@@ -32,9 +32,7 @@ def test_endpoint_rate_limit_returns_429_and_retry_after(monkeypatch) -> None:
         async def analyze(self, *_args):
             raise InvalidGitHubRepository("invalid")
 
-    monkeypatch.setattr(
-        "app.core.rate_limit.get_settings", lambda: Settings(analysis_rate_limit=1)
-    )
+    monkeypatch.setattr("app.core.rate_limit.get_settings", lambda: Settings(analysis_rate_limit=1))
     get_rate_limiter.cache_clear()
     app.dependency_overrides[get_pull_request_service] = InvalidService
     client = TestClient(app)

@@ -294,25 +294,50 @@ class ExperimentCompiler:
             endpoint = perf_change.endpoint if perf_change else "GET /dashboard"
             method = perf_change.method if perf_change else "GET"
             symbol = perf_change.downstream_symbol if perf_change else "external_client"
+
+            # Deterministic compiler bounds load parameters safely from AI intensity recommendation
+            from app.schemas.hypothesis import LoadIntensity
+
+            if hypothesis.intensity == LoadIntensity.LOW:
+                concurrency = 30
+                request_count = 100
+            elif hypothesis.intensity == LoadIntensity.MEDIUM:
+                concurrency = 75
+                request_count = 200
+            else:
+                concurrency = 150
+                request_count = 300
+
             steps = [
                 ExperimentStep(
                     order=1,
                     type=ExperimentStepType.INITIALIZE_LOAD_ENVIRONMENT,
-                    description="Initialize ShiftSafe controlled runtime environment with downstream capacity model",
+                    description=(
+                        "Initialize ShiftSafe controlled runtime with downstream capacity model"
+                    ),
                 ),
                 ExperimentStep(
                     order=2,
-                    type=ExperimentStepType.RUN_CONCURRENT_LOAD,
-                    description=f"Execute 150 concurrent peak-load requests against {endpoint}",
+                    type=ExperimentStepType.FUNCTIONAL_CHECK,
+                    description=f"Execute baseline single-request test against {endpoint}",
                     endpoint=endpoint,
                     method=method,
-                    concurrency=150,
-                    request_count=300,
                 ),
                 ExperimentStep(
                     order=3,
+                    type=ExperimentStepType.RUN_CONCURRENT_LOAD,
+                    description=f"Execute {concurrency} peak-load requests against {endpoint}",
+                    endpoint=endpoint,
+                    method=method,
+                    concurrency=concurrency,
+                    request_count=request_count,
+                ),
+                ExperimentStep(
+                    order=4,
                     type=ExperimentStepType.CAPTURE_PERFORMANCE_METRICS,
-                    description="Capture response percentiles (p50/p95/p99), downstream wait time, and timeout rate",
+                    description=(
+                        "Capture percentiles (p50/p95/p99), downstream wait time, and timeouts"
+                    ),
                 ),
             ]
             expected_observation = (

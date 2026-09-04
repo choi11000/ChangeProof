@@ -271,11 +271,7 @@ def test_table_variant_attribute_is_qualified_reference() -> None:
     doc = SourceDocument(
         path="app/sample.py",
         scope=SourceScope.APPLICATION,
-        content=(
-            "x = order.legacy_status\n"
-            "y = orders.legacy_status\n"
-            "z = Order.legacy_status\n"
-        ),
+        content=("x = order.legacy_status\ny = orders.legacy_status\nz = Order.legacy_status\n"),
     )
 
     analyzer = DependencyAnalyzer()
@@ -326,10 +322,7 @@ def test_find_table_and_column_context() -> None:
     doc = SourceDocument(
         path="app/db.py",
         scope=SourceScope.APPLICATION,
-        content=(
-            "# fetch from orders\n"
-            "query = 'SELECT legacy_status FROM orders'\n"
-        ),
+        content=("# fetch from orders\nquery = 'SELECT legacy_status FROM orders'\n"),
     )
 
     analyzer = DependencyAnalyzer()
@@ -377,10 +370,7 @@ def test_identifier_boundary_avoids_partial_match() -> None:
     doc = SourceDocument(
         path="app/service.py",
         scope=SourceScope.APPLICATION,
-        content=(
-            "legacy_status_backup = 'archived'\n"
-            "old_legacy_status_val = 1\n"
-        ),
+        content=("legacy_status_backup = 'archived'\nold_legacy_status_val = 1\n"),
     )
 
     analyzer = DependencyAnalyzer()

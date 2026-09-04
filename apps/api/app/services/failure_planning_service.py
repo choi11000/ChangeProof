@@ -64,8 +64,7 @@ class FailurePlanningService:
                 AnalysisWarning(
                     code=AnalysisWarningCode.AI_NOT_CONFIGURED,
                     message=(
-                        "OpenAI API key is not configured; "
-                        "AI failure hypothesis planning skipped"
+                        "OpenAI API key is not configured; AI failure hypothesis planning skipped"
                     ),
                 )
             )

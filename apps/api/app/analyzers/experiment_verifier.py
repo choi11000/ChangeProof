@@ -62,7 +62,7 @@ class ExperimentVerifier:
                 labels = ", ".join(sorted(step.value for step in missing_perf))
                 return (
                     ExperimentVerdict.INCONCLUSIVE,
-                    f"Performance experiment outcome inconclusive: Missing required steps: {labels}.",
+                    f"Performance outcome inconclusive: Missing required steps: {labels}.",
                 )
             capture = step_map[ExperimentStepType.CAPTURE_PERFORMANCE_METRICS]
             if capture.observation_code == "DOWNSTREAM_QUEUE_AMPLIFICATION":
@@ -70,7 +70,7 @@ class ExperimentVerifier:
                     ExperimentVerdict.PROVEN_FAIL,
                     (
                         "Peak bottleneck reproduced in controlled load test: "
-                        "Downstream queue amplification detected (p95 latency degraded under peak concurrency)."
+                        "Downstream queue amplification detected under peak concurrency."
                     ),
                 )
             if all(step_map[s].status is ExperimentStepStatus.PASSED for s in PERF_REQUIRED_STEPS):

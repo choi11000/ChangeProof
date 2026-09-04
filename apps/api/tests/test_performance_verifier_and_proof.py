@@ -1,11 +1,5 @@
-import pytest
 from app.analyzers.experiment_verifier import ExperimentVerifier
 from app.core.config import Settings
-from app.fixtures.shiftsafe_fixtures import (
-    ControlledPerformanceFixture,
-    DownstreamMode,
-    get_controlled_performance_fixture,
-)
 from app.schemas.dependency import ChangeFact
 from app.schemas.execution import (
     ExecuteExperimentRequest,
@@ -18,8 +12,6 @@ from app.schemas.github import GitHubRepositoryRef, PullRequestMetadata
 from app.schemas.performance import (
     PerformanceChange,
     PerformanceChangeType,
-    PerformanceExperimentConfig,
-    PerformanceMetrics,
     PerformanceObservationCode,
 )
 from app.schemas.remediation import (

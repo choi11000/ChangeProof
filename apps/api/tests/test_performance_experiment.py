@@ -1,5 +1,4 @@
 import asyncio
-import pytest
 
 from app.executors.performance_experiment import (
     PerformanceExperimentExecutor,
@@ -8,7 +7,6 @@ from app.executors.performance_experiment import (
 from app.fixtures.shiftsafe_fixtures import (
     ControlledPerformanceFixture,
     DownstreamMode,
-    get_controlled_performance_fixture,
 )
 from app.schemas.execution import ExperimentStepStatus
 from app.schemas.experiment import ExperimentStepType, ExperimentTemplate
@@ -48,18 +46,21 @@ def test_performance_executor_runs_fast_fixture():
     executor = PerformanceExperimentExecutor()
     results = asyncio.run(executor.execute_fixture_async(fixture, variant="remediated"))
 
-    assert len(results) == 3
+    assert len(results) == 4
     assert results[0].type == ExperimentStepType.INITIALIZE_LOAD_ENVIRONMENT
     assert results[0].status == ExperimentStepStatus.PASSED
 
-    assert results[1].type == ExperimentStepType.RUN_CONCURRENT_LOAD
+    assert results[1].type == ExperimentStepType.FUNCTIONAL_CHECK
     assert results[1].status == ExperimentStepStatus.PASSED
-    assert results[1].performance_metrics is not None
-    assert results[1].performance_metrics.request_count == 10
 
-    assert results[2].type == ExperimentStepType.CAPTURE_PERFORMANCE_METRICS
+    assert results[2].type == ExperimentStepType.RUN_CONCURRENT_LOAD
     assert results[2].status == ExperimentStepStatus.PASSED
-    assert results[2].observation_code == PerformanceObservationCode.PERFORMANCE_HEALTHY
+    assert results[2].performance_metrics is not None
+    assert results[2].performance_metrics.request_count == 10
+
+    assert results[3].type == ExperimentStepType.CAPTURE_PERFORMANCE_METRICS
+    assert results[3].status == ExperimentStepStatus.PASSED
+    assert results[3].observation_code == PerformanceObservationCode.PERFORMANCE_HEALTHY
 
 
 def test_performance_executor_synchronous_wrapper():
@@ -82,5 +83,5 @@ def test_performance_executor_synchronous_wrapper():
     )
     executor = PerformanceExperimentExecutor()
     results = executor.execute_fixture(fixture, variant="baseline")
-    assert len(results) == 3
-    assert results[2].observation_code == PerformanceObservationCode.PERFORMANCE_HEALTHY
+    assert len(results) == 4
+    assert results[3].observation_code == PerformanceObservationCode.PERFORMANCE_HEALTHY

@@ -38,9 +38,7 @@ class FixtureExecutionResult:
     def __len__(self) -> int:
         return len(self.step_results)
 
-    def __getitem__(
-        self, index: int | slice
-    ) -> ExperimentStepResult | list[ExperimentStepResult]:
+    def __getitem__(self, index: int | slice) -> ExperimentStepResult | list[ExperimentStepResult]:
         return self.step_results[index]
 
 

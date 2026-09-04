@@ -37,6 +37,8 @@ class LocalLoadMetrics:
     error_rate: float
     observation: str
     verdict: str
+    functional_pass: bool = True
+    functional_latency_ms: int = 0
 
 
 async def run_local_load(
@@ -51,6 +53,20 @@ async def run_local_load(
     validated_base = validate_target_url(target_url)
     full_url = f"{validated_base}{endpoint}"
 
+    # Step 1: Functional Check (single request)
+    functional_pass = False
+    functional_latency_ms = 0
+    async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=False) as client:
+        try:
+            t0 = time.perf_counter()
+            f_resp = await client.request(method, full_url)
+            t1 = time.perf_counter()
+            functional_latency_ms = max(1, int((t1 - t0) * 1000))
+            if f_resp.status_code == 200:
+                functional_pass = True
+        except Exception:
+            functional_pass = False
+
     latencies: list[int] = []
     success_count = 0
     timeout_count = 0
@@ -59,7 +75,7 @@ async def run_local_load(
     sem = asyncio.Semaphore(concurrency)
     t_start = time.perf_counter()
 
-    async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+    async with httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=False) as client:
         async def worker():
             nonlocal success_count, timeout_count, error_count
             async with sem:
@@ -115,4 +131,6 @@ async def run_local_load(
         error_rate=error_rate,
         observation=obs,
         verdict=verdict,
+        functional_pass=functional_pass,
+        functional_latency_ms=functional_latency_ms,
     )

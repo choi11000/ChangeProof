@@ -22,7 +22,9 @@ class ControlledWeatherDependency:
     Bounded capacity: Semaphore(capacity) simulating limited outbound connections/workers.
     """
 
-    def __init__(self, mode: DownstreamMode = DownstreamMode.SLOW, latency_ms: int = 700, capacity: int = 10):
+    def __init__(
+        self, mode: DownstreamMode = DownstreamMode.SLOW, latency_ms: int = 700, capacity: int = 10
+    ):
         self.mode = mode
         self.latency_ms = latency_ms
         self.capacity = capacity
@@ -61,9 +63,11 @@ class ControlledWeatherDependency:
 
 
 class ShiftSafeApp:
-    """In-process ShiftSafe demo application supporting Baseline, Candidate, and Remediated subjects."""
+    """In-process ShiftSafe demo supporting Baseline, Candidate, and Remediated subjects."""
 
-    def __init__(self, variant: str = "candidate", weather_dep: ControlledWeatherDependency | None = None):
+    def __init__(
+        self, variant: str = "candidate", weather_dep: ControlledWeatherDependency | None = None
+    ):
         self.variant = variant
         self.weather_dep = weather_dep or ControlledWeatherDependency()
         # Remediated cache state

@@ -66,9 +66,7 @@ async def _sandbox_busy(_request: Request, error: Exception) -> JSONResponse:
 async def _unexpected_error(request: Request, error: Exception) -> JSONResponse:
     request_id = getattr(request.state, "request_id", "unknown")
     safe_traceback = redact_secrets("".join(traceback.format_exception(error)))
-    logger.error(
-        "unexpected_request_error\n%s", safe_traceback, extra={"request_id": request_id}
-    )
+    logger.error("unexpected_request_error\n%s", safe_traceback, extra={"request_id": request_id})
     response = _error(
         status.HTTP_500_INTERNAL_SERVER_ERROR,
         f"Internal service error. Reference: {request_id}",

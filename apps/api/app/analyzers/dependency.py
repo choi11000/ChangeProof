@@ -369,12 +369,8 @@ def summarize_impact(
     target_list = list(targets)
     evidence_list = list(evidences)
 
-    app_files = {
-        ev.path for ev in evidence_list if ev.source_scope is SourceScope.APPLICATION
-    }
-    test_files = {
-        ev.path for ev in evidence_list if ev.source_scope is SourceScope.TEST
-    }
+    app_files = {ev.path for ev in evidence_list if ev.source_scope is SourceScope.APPLICATION}
+    test_files = {ev.path for ev in evidence_list if ev.source_scope is SourceScope.TEST}
 
     qualified = sum(
         1 for ev in evidence_list if ev.match_kind is DependencyMatchKind.QUALIFIED_REFERENCE

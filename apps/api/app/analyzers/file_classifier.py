@@ -73,12 +73,9 @@ def classify_file(file: ChangedFile) -> ClassifiedFile:
             reason="File extension or filename matches documentation",
             content_policy=policy,
         )
-    if (
-        name in {"openapi.yaml", "openapi.yml", "openapi.json"}
-        or (
-            suffix in {".yaml", ".yml", ".json"}
-            and any(part in {"openapi", "swagger", "api_spec", "api-spec"} for part in lower_parts)
-        )
+    if name in {"openapi.yaml", "openapi.yml", "openapi.json"} or (
+        suffix in {".yaml", ".yml", ".json"}
+        and any(part in {"openapi", "swagger", "api_spec", "api-spec"} for part in lower_parts)
     ):
         return ClassifiedFile(
             file=safe_file,

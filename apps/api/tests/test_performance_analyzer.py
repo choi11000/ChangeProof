@@ -1,4 +1,3 @@
-import pytest
 from app.analyzers.performance_analyzer import PerformanceAnalyzer
 from app.schemas.dependency import DependencyTargetType
 from app.schemas.performance import PerformanceChangeType
@@ -35,7 +34,10 @@ def health():
     dash_fact = next(f for f in facts if "/dashboard" in f.id)
     assert dash_fact.domain == "PERFORMANCE"
     assert dash_fact.performance_change is not None
-    assert dash_fact.performance_change.change_type == PerformanceChangeType.EXTERNAL_CALL_ADDED_TO_REQUEST_PATH
+    assert (
+        dash_fact.performance_change.change_type
+        == PerformanceChangeType.EXTERNAL_CALL_ADDED_TO_REQUEST_PATH
+    )
     assert dash_fact.performance_change.endpoint == "GET /dashboard"
     assert dash_fact.performance_change.downstream_symbol == "weather_client.get_current"
 

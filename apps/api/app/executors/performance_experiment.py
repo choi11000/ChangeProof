@@ -2,7 +2,6 @@ import asyncio
 import logging
 import math
 import time
-from typing import Any
 
 from app.fixtures.shiftsafe_fixtures import (
     ControlledPerformanceFixture,
@@ -42,8 +41,8 @@ def calculate_percentile(values: list[int], percentile: float) -> int:
 class PerformanceExperimentExecutor:
     """Executes controlled concurrent peak-load experiments.
 
-    Collects per-request timing and calculates percentiles, throughput, inflight, and queue wait times.
-    Supports in-process ShiftSafe fixtures as well as external HTTP endpoints (for local runner).
+    Collects per-request timing, throughput, inflight, and queue wait times.
+    Supports in-process ShiftSafe fixtures as well as external HTTP endpoints.
     """
 
     async def execute_fixture_async(
@@ -80,7 +79,36 @@ class PerformanceExperimentExecutor:
             )
         )
 
-        # Step 2: Run Concurrent Load
+        # Step 2: Functional Check (Single request verification)
+        t_func_start = time.perf_counter()
+        func_status = 200
+        func_err = None
+        try:
+            await app.get_dashboard()
+        except Exception as e:
+            func_status = 500
+            func_err = str(e)
+        t_func_end = time.perf_counter()
+        func_dur = max(1, int((t_func_end - t_func_start) * 1000))
+
+        step_results.append(
+            ExperimentStepResult(
+                order=2,
+                type=ExperimentStepType.FUNCTIONAL_CHECK,
+                status=ExperimentStepStatus.PASSED
+                if func_status == 200
+                else ExperimentStepStatus.FAILED,
+                duration_ms=func_dur,
+                http_status=func_status,
+                message=(
+                    f"Single-request functional check: HTTP {func_status} in {func_dur}ms (PASS)"
+                    if func_status == 200
+                    else f"Functional check failed: {func_err}"
+                ),
+            )
+        )
+
+        # Step 3: Run Concurrent Load
         t_load_start = time.perf_counter()
         timings: list[RequestTiming] = []
         sem = asyncio.Semaphore(concurrency)
@@ -168,7 +196,7 @@ class PerformanceExperimentExecutor:
         load_step_status = ExperimentStepStatus.PASSED
         step_results.append(
             ExperimentStepResult(
-                order=2,
+                order=3,
                 type=ExperimentStepType.RUN_CONCURRENT_LOAD,
                 status=load_step_status,
                 duration_ms=int(total_duration * 1000),
@@ -181,12 +209,14 @@ class PerformanceExperimentExecutor:
             )
         )
 
-        # Step 3: Capture Performance Metrics & Observation
+        # Step 4: Capture Performance Metrics & Observation
         # Observation is DOWNSTREAM_QUEUE_AMPLIFICATION if downstream wait or p95 explodes
-        if variant == "candidate" and (p95 >= 1500 or downstream_p95 >= 1000 or timeout_rate > 0.05):
+        if variant == "candidate" and (
+            p95 >= 1500 or downstream_p95 >= 1000 or timeout_rate > 0.05
+        ):
             obs_code = PerformanceObservationCode.DOWNSTREAM_QUEUE_AMPLIFICATION
             obs_msg = (
-                f"Bottleneck observed: downstream wait amplified to {downstream_p95}ms (p95 latency {p95}ms) "
+                f"Bottleneck: downstream wait amplified to {downstream_p95}ms (p95 {p95}ms) "
                 f"under {concurrency} concurrent requests"
             )
             step_status = ExperimentStepStatus.FAILED
@@ -197,7 +227,7 @@ class PerformanceExperimentExecutor:
 
         step_results.append(
             ExperimentStepResult(
-                order=3,
+                order=4,
                 type=ExperimentStepType.CAPTURE_PERFORMANCE_METRICS,
                 status=step_status,
                 duration_ms=5,
@@ -219,6 +249,7 @@ class PerformanceExperimentExecutor:
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 import nest_asyncio
+
                 nest_asyncio.apply()
                 return loop.run_until_complete(self.execute_fixture_async(fixture, variant=variant))
             return loop.run_until_complete(self.execute_fixture_async(fixture, variant=variant))

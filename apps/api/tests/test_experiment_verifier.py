@@ -203,9 +203,7 @@ def test_wrong_sqlstate_is_inconclusive_even_when_message_matches() -> None:
     steps = _complete_steps_with_query_failure(
         sql_state="42601", message='column "legacy_status" does not exist'
     )
-    verdict, _ = ExperimentVerifier().evaluate(
-        ExperimentTemplate.DROPPED_COLUMN_REFERENCE, steps
-    )
+    verdict, _ = ExperimentVerifier().evaluate(ExperimentTemplate.DROPPED_COLUMN_REFERENCE, steps)
     assert verdict is ExperimentVerdict.INCONCLUSIVE
 
 
@@ -213,9 +211,7 @@ def test_message_text_without_sqlstate_cannot_prove_failure() -> None:
     steps = _complete_steps_with_query_failure(
         sql_state=None, message='column "legacy_status" does not exist'
     )
-    verdict, _ = ExperimentVerifier().evaluate(
-        ExperimentTemplate.DROPPED_COLUMN_REFERENCE, steps
-    )
+    verdict, _ = ExperimentVerifier().evaluate(ExperimentTemplate.DROPPED_COLUMN_REFERENCE, steps)
     assert verdict is ExperimentVerdict.INCONCLUSIVE
 
 

@@ -63,9 +63,7 @@ class GitHubClient:
         self._http = http_client
         self._public_repositories_only = public_repositories_only
 
-    async def verify_repository(
-        self, repository: GitHubRepositoryRef
-    ) -> GitHubRepositoryMetadata:
+    async def verify_repository(self, repository: GitHubRepositoryRef) -> GitHubRepositoryMetadata:
         data = await self._get(
             f"/repos/{repository.owner}/{repository.repo}",
             not_found=GitHubRepositoryNotFound("GitHub repository not found"),

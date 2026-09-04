@@ -65,9 +65,7 @@ class DeterministicFixtureExecutor:
 )
 def test_controlled_remediation_proves_fixed(fixture_id: str) -> None:
     execution = ExperimentExecutionService(DeterministicFixtureExecutor())
-    proof = RemediationProofService(execution).prove(
-        RemediationProofRequest(fixture_id=fixture_id)
-    )
+    proof = RemediationProofService(execution).prove(RemediationProofRequest(fixture_id=fixture_id))
     assert proof.before.verdict is ExperimentVerdict.PROVEN_FAIL
     assert proof.after.verdict is ExperimentVerdict.PROVEN_PASS
     assert proof.same_experiment is True

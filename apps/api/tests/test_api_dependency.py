@@ -59,7 +59,7 @@ def get_prop(user_id: int):
     assert evidences[0].target.field == "email"
     assert evidences[0].target.path == "/users/{id}"
     assert evidences[0].changed_in_pull_request is False
-    assert "response[\"email\"]" in evidences[0].excerpt
+    assert 'response["email"]' in evidences[0].excerpt
 
 
 def test_api_dependency_analyzer_no_match():

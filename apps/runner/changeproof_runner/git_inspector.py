@@ -14,24 +14,20 @@ def get_git_changed_files(repo_path: Path, base_ref: str = "HEAD~1") -> list[str
         )
         files = [f.strip() for f in result.stdout.splitlines() if f.strip()]
         return files
-    except Exception as exc:
+    except Exception:
         # Fallback: scan repository python files directly if not a git diff
         return []
 
 
-def inspect_python_file(file_path: Path) -> list[dict[str, Any]]:
-    """Scan a Python file for FastAPI routes with external client calls."""
-    if not file_path.exists() or not file_path.name.endswith(".py"):
-        return []
-
+def _extract_route_calls(source_code: str, file_path: str) -> list[dict[str, Any]]:
+    """Extract external calls inside FastAPI routes from source code."""
     try:
-        source_code = file_path.read_text(encoding="utf-8")
-        tree = ast.parse(source_code, filename=str(file_path))
+        tree = ast.parse(source_code, filename=file_path)
     except Exception:
         return []
 
     findings = []
-    external_patterns = {"requests", "httpx", "weather_client", "client", "external", "api"}
+    external_patterns = {"requests", "httpx", "weather_client", "client", "external", "api", "downstream"}
     router_symbols = {"router", "app", "api_router"}
 
     for node in ast.walk(tree):
@@ -52,7 +48,6 @@ def inspect_python_file(file_path: Path) -> list[dict[str, Any]]:
             for stmt in node.body:
                 for b_node in ast.walk(stmt):
                     if isinstance(b_node, ast.Call):
-                        # Extract call name
                         chain = []
                         curr = b_node.func
                         while isinstance(curr, ast.Attribute):
@@ -68,7 +63,7 @@ def inspect_python_file(file_path: Path) -> list[dict[str, Any]]:
                                 if any(p in call_sym.lower() for p in external_patterns):
                                     findings.append(
                                         {
-                                            "file": str(file_path),
+                                            "file": file_path,
                                             "line": b_node.lineno,
                                             "method": route_method,
                                             "path": route_path,
@@ -76,3 +71,54 @@ def inspect_python_file(file_path: Path) -> list[dict[str, Any]]:
                                         }
                                     )
     return findings
+
+
+def get_git_file_content_at_ref(repo_path: Path, rel_path: str, ref: str = "HEAD~1") -> str | None:
+    """Retrieve file content at specified git ref."""
+    try:
+        # Normalize path separators for git show (must be forward slash)
+        git_path = rel_path.replace("\\", "/")
+        cmd = ["git", "show", f"{ref}:{git_path}"]
+        result = subprocess.run(
+            cmd, cwd=repo_path, capture_output=True, text=True, check=True
+        )
+        return result.stdout
+    except Exception:
+        return None
+
+
+def inspect_python_file(
+    file_path: Path,
+    repo_path: Path | None = None,
+    base_ref: str = "HEAD~1",
+) -> list[dict[str, Any]]:
+    """Scan a Python file for FastAPI routes with external client calls.
+
+    When repo_path is provided, performs change-aware diff comparison against base_ref,
+    only reporting external calls that are genuinely ADDED in this change.
+    """
+    if not file_path.exists() or not file_path.name.endswith(".py"):
+        return []
+
+    try:
+        head_code = file_path.read_text(encoding="utf-8")
+    except Exception:
+        return []
+
+    head_findings = _extract_route_calls(head_code, str(file_path))
+
+    # If repo_path provided, check against base_ref
+    if repo_path is not None:
+        try:
+            rel_path = str(file_path.relative_to(repo_path))
+        except ValueError:
+            rel_path = file_path.name
+
+        base_code = get_git_file_content_at_ref(repo_path, rel_path, ref=base_ref)
+        if base_code is not None:
+            base_findings = _extract_route_calls(base_code, str(file_path))
+            base_keys = {(f["method"], f["path"], f["symbol"]) for f in base_findings}
+            # Only keep findings NOT in base
+            return [f for f in head_findings if (f["method"], f["path"], f["symbol"]) not in base_keys]
+
+    return head_findings

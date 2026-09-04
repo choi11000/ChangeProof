@@ -34,7 +34,7 @@ class ApiDependencyAnalyzer:
             # Regex to match response["field"], response['field'], or .field
             dict_pattern = re.compile(
                 rf'(\b(?:response|res|data|user|item|result|payload|body)\[["\']{re.escape(field)}["\']\]|'
-                rf'\b(?:response|res|data|user|item|result)\.{re.escape(field)}\b)',
+                rf"\b(?:response|res|data|user|item|result)\.{re.escape(field)}\b)",
                 re.IGNORECASE,
             )
 

@@ -48,9 +48,7 @@ CONTROLLED_REMEDIATIONS: dict[str, ControlledRemediation] = {
             "Normalize synthetic email data to 30 characters before narrowing the type; "
             "this controlled remediation changes data."
         ),
-        remediated_migration_path=(
-            "samples/risky-saas/remediations/002_normalize_email.sql"
-        ),
+        remediated_migration_path=("samples/risky-saas/remediations/002_normalize_email.sql"),
     ),
 }
 

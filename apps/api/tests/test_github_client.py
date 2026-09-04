@@ -85,9 +85,7 @@ def test_repository_metadata_public_allowed_and_private_policy_enforced() -> Non
             "private": True,
             "visibility": "private",
         }
-        private_client = response_handler(
-            lambda request: httpx.Response(200, json=private_payload)
-        )
+        private_client = response_handler(lambda request: httpx.Response(200, json=private_payload))
         async with private_client:
             with pytest.raises(
                 GitHubPrivateRepositoryRestricted,

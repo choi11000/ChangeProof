@@ -84,8 +84,7 @@ def test_generate_grounded_hypothesis() -> None:
                     category=FailureCategory.SCHEMA_CONTRACT_BREAK,
                     title="Dropped column remains referenced",
                     statement=(
-                        "The application still references orders.legacy_status "
-                        "after migration."
+                        "The application still references orders.legacy_status after migration."
                     ),
                     change_ids=["change_drop_status"],
                     evidence_ids=["ev_order_service_line_11"],
@@ -102,9 +101,7 @@ def test_generate_grounded_hypothesis() -> None:
     change = _sample_change()
     evidence = _sample_evidence()
 
-    hypotheses, plans, warnings, steps = asyncio.run(
-        service.plan([change], [evidence])
-    )
+    hypotheses, plans, warnings, steps = asyncio.run(service.plan([change], [evidence]))
 
     assert len(hypotheses) == 1
     assert hypotheses[0].id == "hyp_001"
@@ -277,9 +274,7 @@ def test_prompt_injection_boundary_fixture() -> None:
     service = FailurePlanningService(generator=generator)
     change = _sample_change()
 
-    hypotheses, plans, warnings, _ = asyncio.run(
-        service.plan([change], [evidence])
-    )
+    hypotheses, plans, warnings, _ = asyncio.run(service.plan([change], [evidence]))
 
     # Verification: planning context passed the excerpt as pure untrusted text data
     assert generator.last_context is not None

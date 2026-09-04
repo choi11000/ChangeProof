@@ -20,9 +20,7 @@ class RemediationUnavailableError(ValueError):
 def evaluate_proof_pair(
     before: ExperimentRun, after: ExperimentRun
 ) -> tuple[RemediationProofVerdict, bool, bool]:
-    same_experiment = (
-        before.experiment_contract_digest == after.experiment_contract_digest
-    )
+    same_experiment = before.experiment_contract_digest == after.experiment_contract_digest
     subject_changed = before.subject_digest != after.subject_digest
     if (
         before.verdict is ExperimentVerdict.EXECUTION_ERROR
@@ -38,10 +36,10 @@ def evaluate_proof_pair(
         and after.verdict is ExperimentVerdict.PROVEN_PASS
     ):
         return RemediationProofVerdict.PROVEN_FIXED, same_experiment, subject_changed
-    if (
-        before.verdict in (ExperimentVerdict.PROVEN_FAIL, ExperimentVerdict.PROVEN_BOTTLENECK)
-        and after.verdict in (ExperimentVerdict.PROVEN_FAIL, ExperimentVerdict.PROVEN_BOTTLENECK)
-    ):
+    if before.verdict in (
+        ExperimentVerdict.PROVEN_FAIL,
+        ExperimentVerdict.PROVEN_BOTTLENECK,
+    ) and after.verdict in (ExperimentVerdict.PROVEN_FAIL, ExperimentVerdict.PROVEN_BOTTLENECK):
         return RemediationProofVerdict.NOT_FIXED, same_experiment, subject_changed
     return RemediationProofVerdict.INCONCLUSIVE, same_experiment, subject_changed
 
@@ -54,12 +52,20 @@ class RemediationProofService:
         # Check Performance fixtures first
         perf_fixture = get_controlled_performance_fixture(request.fixture_id)
         if perf_fixture is not None:
+            baseline = self.execution_service.execute_controlled_performance_fixture(
+                perf_fixture, variant="baseline"
+            )
             before = self.execution_service.execute_controlled_performance_fixture(
                 perf_fixture, variant="candidate"
             )
             after = self.execution_service.execute_controlled_performance_fixture(
                 perf_fixture, variant="remediated"
             )
+            if before.performance_metrics and baseline.performance_metrics:
+                b_p95 = max(1, baseline.performance_metrics.p95_ms)
+                c_p95 = before.performance_metrics.p95_ms
+                before.performance_metrics.regression_ratio = round(c_p95 / b_p95, 1)
+
             verdict, same_experiment, subject_changed = evaluate_proof_pair(before, after)
             return RemediationProof(
                 id=f"proof_perf_{uuid.uuid4().hex[:12]}",
@@ -69,6 +75,7 @@ class RemediationProofService:
                 strategy=perf_fixture.remediation_strategy,
                 description=perf_fixture.remediation_description,
                 experiment_contract_digest=before.experiment_contract_digest,
+                baseline=baseline,
                 before=before,
                 after=after,
                 verdict=verdict,
@@ -110,9 +117,7 @@ class RemediationProofService:
                 "No remediation is required or available for this controlled experiment."
             )
 
-        before = self.execution_service.execute(
-            ExecuteExperimentRequest(fixture_id=fixture.id)
-        )
+        before = self.execution_service.execute(ExecuteExperimentRequest(fixture_id=fixture.id))
         after = self.execution_service.execute_controlled_fixture(
             fixture,
             subject_variant="remediated",

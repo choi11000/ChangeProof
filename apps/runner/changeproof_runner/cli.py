@@ -21,7 +21,7 @@ def run_inspect(args: argparse.Namespace) -> int:
         files_to_check = list(repo_path.glob("**/*.py"))
 
     for py_file in files_to_check:
-        findings = inspect_python_file(py_file)
+        findings = inspect_python_file(py_file, repo_path=repo_path, base_ref=args.base)
         all_findings.extend(findings)
 
     if args.json:
@@ -58,7 +58,7 @@ def run_verify(args: argparse.Namespace) -> int:
 
     findings = []
     for py_file in files_to_check:
-        findings.extend(inspect_python_file(py_file))
+        findings.extend(inspect_python_file(py_file, repo_path=repo_path, base_ref=args.base))
 
     endpoint = args.endpoint or (findings[0]["path"] if findings else "/dashboard")
     method = findings[0]["method"] if findings else "GET"
@@ -100,6 +100,7 @@ def run_verify(args: argparse.Namespace) -> int:
         return 0 if metrics.verdict in ("PROVEN_PASS", "PROVEN_BOTTLENECK") else 1
 
     print("\nResults:")
+    print(f"  Functional Check: {'PASS' if metrics.functional_pass else 'FAIL'} ({metrics.functional_latency_ms} ms)")
     print(f"  p50 Latency:      {metrics.p50_ms} ms")
     print(f"  p95 Latency:      {metrics.p95_ms} ms")
     print(f"  p99 Latency:      {metrics.p99_ms} ms")

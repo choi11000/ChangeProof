@@ -60,6 +60,7 @@ class ExecuteExperimentRequest(BaseModel):
 
     fixture_id: str
     experiment_plan_id: str | None = None
+    variant: str = "candidate"
 
 
 class ExecuteExperimentResponse(BaseModel):

@@ -64,7 +64,7 @@ class ExperimentExecutionService:
             return self.execute_controlled_performance_fixture(
                 perf_fixture,
                 experiment_plan_id=request.experiment_plan_id,
-                variant="candidate",
+                variant=request.variant or "candidate",
             )
 
         api_fixture = get_controlled_api_fixture(request.fixture_id)

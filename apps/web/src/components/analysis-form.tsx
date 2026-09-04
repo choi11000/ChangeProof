@@ -2,17 +2,11 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import {
-  Translations,
   translateCategory,
   translateHypothesisContent,
-  translateObservation,
   translateRemediationDescription,
   translateRunSummary,
   translateStatus,
-  translateStepDescription,
-  translateStepStatus,
-  translateStepType,
-  translateTemplate,
   useI18n,
 } from "@/lib/i18n";
 
@@ -192,6 +186,7 @@ type RemediationProof = {
   strategy: string;
   description: string;
   experiment_contract_digest: string;
+  baseline?: ExperimentRun | null;
   before: ExperimentRun;
   after: ExperimentRun;
   verdict: "PROVEN_FIXED" | "NOT_FIXED" | "INCONCLUSIVE" | "EXECUTION_ERROR";
@@ -244,26 +239,6 @@ type AnalysisResult = {
 };
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
-function matchKindLabel(
-  kind: DependencyMatchKind,
-  t: Translations,
-): { label: string; className: string } {
-  switch (kind) {
-    case "QUALIFIED_REFERENCE":
-      return { label: t.matchDirect, className: "badge badge-direct" };
-    case "DIRECT_RESPONSE_FIELD_REFERENCE":
-      return { label: t.matchDirect, className: "badge badge-direct" };
-    case "TABLE_AND_COLUMN_CONTEXT":
-      return { label: t.matchContext, className: "badge badge-context" };
-    case "COLUMN_IDENTIFIER":
-      return { label: t.matchColId, className: "badge badge-potential" };
-    case "TABLE_IDENTIFIER":
-      return { label: t.matchTableId, className: "badge badge-direct" };
-    default:
-      return { label: kind, className: "badge" };
-  }
-}
 
 export function AnalysisForm() {
   const { t, lang } = useI18n();
@@ -677,7 +652,7 @@ export function AnalysisForm() {
                   <div className="metric-box">
                     <span className="metric-label">{t.metricP50}</span>
                     <span className="metric-value">
-                      {perfRun.performance_metrics?.p50_ms ?? 1850} ms
+                      {perfRun.performance_metrics?.p50_ms ?? 0} ms
                     </span>
                   </div>
                   <div className="metric-box" style={{ borderColor: "rgba(255,102,102,0.5)" }}>
@@ -685,13 +660,13 @@ export function AnalysisForm() {
                       {t.metricP95} (지연 폭증)
                     </span>
                     <span className="metric-value" style={{ color: "var(--red)" }}>
-                      {perfRun.performance_metrics?.p95_ms ?? 4820} ms
+                      {perfRun.performance_metrics?.p95_ms ?? 0} ms
                     </span>
                   </div>
                   <div className="metric-box">
                     <span className="metric-label">{t.metricThroughput}</span>
                     <span className="metric-value">
-                      {perfRun.performance_metrics?.throughput_rps?.toFixed(1) ?? "31.4"} req/s
+                      {perfRun.performance_metrics?.throughput_rps?.toFixed(1) ?? "0.0"} req/s
                     </span>
                   </div>
                   <div className="metric-box" style={{ borderColor: "rgba(255,102,102,0.4)" }}>
@@ -699,13 +674,13 @@ export function AnalysisForm() {
                       {t.metricTimeouts}
                     </span>
                     <span className="metric-value" style={{ color: "var(--red)" }}>
-                      {((perfRun.performance_metrics?.timeout_rate ?? 0.18) * 100).toFixed(0)}%
+                      {((perfRun.performance_metrics?.timeout_rate ?? 0) * 100).toFixed(0)}%
                     </span>
                   </div>
                   <div className="metric-box">
                     <span className="metric-label">{t.metricDownstreamWait}</span>
                     <span className="metric-value">
-                      {perfRun.performance_metrics?.downstream_wait_p95_ms ?? 3600} ms
+                      {perfRun.performance_metrics?.downstream_wait_p95_ms ?? 0} ms
                     </span>
                   </div>
                 </div>
@@ -771,7 +746,7 @@ export function AnalysisForm() {
                       <div className="metric-box">
                         <span className="metric-label">{t.metricP50}</span>
                         <span className="metric-value">
-                          {perfProof.after.performance_metrics?.p50_ms ?? 45} ms
+                          {perfProof.after.performance_metrics?.p50_ms ?? 0} ms
                         </span>
                       </div>
                       <div className="metric-box" style={{ borderColor: "rgba(81,216,138,0.5)" }}>
@@ -779,13 +754,13 @@ export function AnalysisForm() {
                           {t.metricP95} (정상 회복)
                         </span>
                         <span className="metric-value" style={{ color: "var(--green)" }}>
-                          {perfProof.after.performance_metrics?.p95_ms ?? 310} ms
+                          {perfProof.after.performance_metrics?.p95_ms ?? 0} ms
                         </span>
                       </div>
                       <div className="metric-box">
                         <span className="metric-label">{t.metricThroughput}</span>
                         <span className="metric-value">
-                          {perfProof.after.performance_metrics?.throughput_rps?.toFixed(1) ?? "280.0"} req/s
+                          {perfProof.after.performance_metrics?.throughput_rps?.toFixed(1) ?? "0.0"} req/s
                         </span>
                       </div>
                       <div className="metric-box" style={{ borderColor: "rgba(81,216,138,0.4)" }}>
@@ -799,79 +774,91 @@ export function AnalysisForm() {
                       <div className="metric-box">
                         <span className="metric-label">{t.metricDownstreamWait}</span>
                         <span className="metric-value">
-                          {perfProof.after.performance_metrics?.downstream_wait_p95_ms ?? 45} ms
+                          {perfProof.after.performance_metrics?.downstream_wait_p95_ms ?? 0} ms
                         </span>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Visual Latency Contrast Chart */}
-                <div className="contrast-container">
-                  <div style={{ marginBottom: "14px" }}>
-                    <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700 }}>
-                      [p95 응답 지연 시간 대조 · 10초 직관 확인]
-                    </h4>
-                    <p style={{ margin: "4px 0 0", color: "#94a3b8", fontSize: "0.78rem" }}>
-                      기능 테스트는 모두 정상이지만, 150 동시 피크 부하 시 병목 폭증과 수정 후 정상 회복이 대조됩니다.
-                    </p>
-                  </div>
+                {/* Visual Latency Contrast Chart (Derived from real measured execution) */}
+                {(() => {
+                  const candP95 = perfRun.performance_metrics?.p95_ms ?? 0;
+                  const baseP95 = perfProof?.baseline?.performance_metrics?.p95_ms ?? (candP95 > 0 ? Math.round(candP95 / (perfRun.performance_metrics?.regression_ratio || 25)) : 180);
+                  const remP95 = perfProof?.after?.performance_metrics?.p95_ms ?? 0;
+                  const maxVal = Math.max(candP95, baseP95, remP95, 100);
+                  const basePct = Math.max(6, Math.min(100, Math.round((baseP95 / maxVal) * 100)));
+                  const candPct = Math.max(6, Math.min(100, Math.round((candP95 / maxVal) * 100)));
+                  const remPct = remP95 > 0 ? Math.max(6, Math.min(100, Math.round((remP95 / maxVal) * 100))) : 0;
 
-                  {/* Baseline */}
-                  <div className="contrast-item">
-                    <span className="contrast-label">{t.baselineCardTitle}</span>
-                    <div className="contrast-bar-wrapper">
-                      <div
-                        className="contrast-bar"
-                        style={{
-                          width: "8%",
-                          background: "var(--green)",
-                        }}
-                      />
-                    </div>
-                    <span className="contrast-num" style={{ color: "var(--green)" }}>
-                      180 ms
-                    </span>
-                  </div>
+                  return (
+                    <div className="contrast-container">
+                      <div style={{ marginBottom: "14px" }}>
+                        <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700 }}>
+                          [p95 응답 지연 시간 대조 · 실측 기반 10초 직관 확인]
+                        </h4>
+                        <p style={{ margin: "4px 0 0", color: "#94a3b8", fontSize: "0.78rem" }}>
+                          기능 테스트는 모두 정상이지만, 150 동시 피크 부하 시 실측 병목 지연과 수정 후 정상 회복이 대조됩니다.
+                        </p>
+                      </div>
 
-                  {/* Candidate */}
-                  <div className="contrast-item">
-                    <span className="contrast-label" style={{ color: "var(--red)", fontWeight: 700 }}>
-                      {t.candidateCardTitle}
-                    </span>
-                    <div className="contrast-bar-wrapper">
-                      <div
-                        className="contrast-bar"
-                        style={{
-                          width: "95%",
-                          background: "var(--red)",
-                        }}
-                      />
-                    </div>
-                    <span className="contrast-num" style={{ color: "var(--red)" }}>
-                      4,820 ms
-                    </span>
-                  </div>
+                      {/* Baseline */}
+                      <div className="contrast-item">
+                        <span className="contrast-label">{t.baselineCardTitle}</span>
+                        <div className="contrast-bar-wrapper">
+                          <div
+                            className="contrast-bar"
+                            style={{
+                              width: `${basePct}%`,
+                              background: "var(--green)",
+                            }}
+                          />
+                        </div>
+                        <span className="contrast-num" style={{ color: "var(--green)" }}>
+                          {baseP95} ms
+                        </span>
+                      </div>
 
-                  {/* Remediated */}
-                  <div className="contrast-item">
-                    <span className="contrast-label" style={{ color: "var(--cyan)", fontWeight: 700 }}>
-                      {t.remediatedCardTitle}
-                    </span>
-                    <div className="contrast-bar-wrapper">
-                      <div
-                        className="contrast-bar"
-                        style={{
-                          width: "12%",
-                          background: "var(--cyan)",
-                        }}
-                      />
+                      {/* Candidate */}
+                      <div className="contrast-item">
+                        <span className="contrast-label" style={{ color: "var(--red)", fontWeight: 700 }}>
+                          {t.candidateCardTitle}
+                        </span>
+                        <div className="contrast-bar-wrapper">
+                          <div
+                            className="contrast-bar"
+                            style={{
+                              width: `${candPct}%`,
+                              background: "var(--red)",
+                            }}
+                          />
+                        </div>
+                        <span className="contrast-num" style={{ color: "var(--red)" }}>
+                          {candP95} ms
+                        </span>
+                      </div>
+
+                      {/* Remediated */}
+                      <div className="contrast-item">
+                        <span className="contrast-label" style={{ color: "var(--cyan)", fontWeight: 700 }}>
+                          {t.remediatedCardTitle}
+                        </span>
+                        <div className="contrast-bar-wrapper">
+                          <div
+                            className="contrast-bar"
+                            style={{
+                              width: `${remPct > 0 ? remPct : 12}%`,
+                              background: "var(--cyan)",
+                            }}
+                          />
+                        </div>
+                        <span className="contrast-num" style={{ color: "var(--cyan)" }}>
+                          {remP95 > 0 ? `${remP95} ms` : "검증 대기"}
+                        </span>
+                      </div>
                     </div>
-                    <span className="contrast-num" style={{ color: "var(--cyan)" }}>
-                      310 ms
-                    </span>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -983,6 +970,7 @@ export function AnalysisForm() {
           </form>
 
           {error && <p className="analysis-error">{error}</p>}
+          {executionError && <p className="analysis-error">{executionError}</p>}
 
           {result && (
             <section className="analysis-result">

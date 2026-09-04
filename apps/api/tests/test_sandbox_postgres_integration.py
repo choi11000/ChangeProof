@@ -45,9 +45,7 @@ class TestSandboxPostgresIntegration:
         executor = PostgresExperimentExecutor(settings.sandbox_database_url)
         service = ExperimentExecutionService(executor)
 
-        run = service.execute(
-            ExecuteExperimentRequest(fixture_id="risky-saas/drop-legacy-status")
-        )
+        run = service.execute(ExecuteExperimentRequest(fixture_id="risky-saas/drop-legacy-status"))
         assert run.verdict is ExperimentVerdict.PROVEN_FAIL
         assert "42703" in run.summary
 
@@ -62,9 +60,7 @@ class TestSandboxPostgresIntegration:
         executor = PostgresExperimentExecutor(settings.sandbox_database_url)
         service = ExperimentExecutionService(executor)
 
-        run = service.execute(
-            ExecuteExperimentRequest(fixture_id="risky-saas/drop-payments")
-        )
+        run = service.execute(ExecuteExperimentRequest(fixture_id="risky-saas/drop-payments"))
         assert run.verdict is ExperimentVerdict.PROVEN_FAIL
         assert "42P01" in run.summary
 
@@ -73,9 +69,7 @@ class TestSandboxPostgresIntegration:
         executor = PostgresExperimentExecutor(settings.sandbox_database_url)
         service = ExperimentExecutionService(executor)
 
-        run = service.execute(
-            ExecuteExperimentRequest(fixture_id="risky-saas/set-not-null")
-        )
+        run = service.execute(ExecuteExperimentRequest(fixture_id="risky-saas/set-not-null"))
         assert run.verdict is ExperimentVerdict.PROVEN_FAIL
         assert "23502" in run.summary
 
@@ -84,9 +78,7 @@ class TestSandboxPostgresIntegration:
         executor = PostgresExperimentExecutor(settings.sandbox_database_url)
         service = ExperimentExecutionService(executor)
 
-        run = service.execute(
-            ExecuteExperimentRequest(fixture_id="risky-saas/shrink-email")
-        )
+        run = service.execute(ExecuteExperimentRequest(fixture_id="risky-saas/shrink-email"))
         assert run.verdict is ExperimentVerdict.PROVEN_FAIL
         assert "22001" in run.summary
 
@@ -95,9 +87,7 @@ class TestSandboxPostgresIntegration:
         executor = PostgresExperimentExecutor(settings.sandbox_database_url)
         service = ExperimentExecutionService(executor)
 
-        run = service.execute(
-            ExecuteExperimentRequest(fixture_id="risky-saas/safe-additive")
-        )
+        run = service.execute(ExecuteExperimentRequest(fixture_id="risky-saas/safe-additive"))
         assert run.verdict is ExperimentVerdict.PROVEN_PASS
         assert all(s.status == "PASSED" for s in run.step_results)
 
@@ -124,13 +114,10 @@ class TestSandboxPostgresIntegration:
 
     def test_real_sandbox_leaves_no_experiment_schemas(self):
         settings = get_settings()
-        url = settings.sandbox_database_url.replace(
-            "postgresql+psycopg://", "postgresql://"
-        )
+        url = settings.sandbox_database_url.replace("postgresql+psycopg://", "postgresql://")
         with psycopg.connect(url) as connection, connection.cursor() as cursor:
             cursor.execute(
-                "SELECT COUNT(*) FROM information_schema.schemata "
-                "WHERE schema_name LIKE 'cp_run_%'"
+                "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name LIKE 'cp_run_%'"
             )
             assert cursor.fetchone()[0] == 0
 
@@ -141,9 +128,7 @@ class TestSandboxPostgresIntegration:
             service = ExperimentExecutionService(
                 PostgresExperimentExecutor(settings.sandbox_database_url)
             )
-            return service.execute(
-                ExecuteExperimentRequest(fixture_id="risky-saas/safe-additive")
-            )
+            return service.execute(ExecuteExperimentRequest(fixture_id="risky-saas/safe-additive"))
 
         with ThreadPoolExecutor(max_workers=2) as pool:
             runs = list(pool.map(lambda _: execute_safe_additive(), range(2)))

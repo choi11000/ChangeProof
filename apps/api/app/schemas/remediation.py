@@ -36,6 +36,7 @@ class RemediationProof(BaseModel):
     strategy: RemediationStrategy
     description: str
     experiment_contract_digest: str
+    baseline: ExperimentRun | None = None
     before: ExperimentRun
     after: ExperimentRun
     verdict: RemediationProofVerdict

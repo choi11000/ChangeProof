@@ -21,6 +21,18 @@ class FailureCategory(StrEnum):
     OTHER = "OTHER"
 
 
+class PerformanceScenarioType(StrEnum):
+    SLOW_DOWNSTREAM = "SLOW_DOWNSTREAM"
+    TIMEOUT_SPIKE = "TIMEOUT_SPIKE"
+    BURST_CONCURRENCY = "BURST_CONCURRENCY"
+
+
+class LoadIntensity(StrEnum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+
+
 class FailureHypothesis(BaseModel):
     id: str
     domain: str = "DATABASE"
@@ -34,6 +46,12 @@ class FailureHypothesis(BaseModel):
     assumptions: list[str] = Field(default_factory=list)
     experiment_template: ExperimentTemplate
     status: HypothesisStatus = HypothesisStatus.UNVERIFIED
+    # Performance Scenario Dimensions (AI proposed bounded parameters)
+    scenario_type: PerformanceScenarioType | None = None
+    intensity: LoadIntensity | None = None
+    risk_mechanism: str | None = None
+    why_functional_test_misses_it: str | None = None
+    stress_dimension: str | None = None
 
 
 class HypothesisProposalResult(BaseModel):

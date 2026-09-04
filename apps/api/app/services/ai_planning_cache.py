@@ -142,9 +142,7 @@ class CachedHypothesisGenerator:
         )
 
     @staticmethod
-    def _is_cacheable(
-        result: HypothesisGenerationResult, context: FailurePlanningContext
-    ) -> bool:
+    def _is_cacheable(result: HypothesisGenerationResult, context: FailurePlanningContext) -> bool:
         change_ids = {item.id for item in context.changes}
         evidence_ids = {item.id for item in context.evidence}
         templates = set(ExperimentTemplate)

@@ -182,7 +182,8 @@ def test_dependency_discovery_finds_unchanged_application_references() -> None:
     # app/order_service.py was NOT in PR changed files, but its reference is discovered!
     assert len(result.dependency_evidence) >= 1
     qualified_evidence = next(
-        e for e in result.dependency_evidence
+        e
+        for e in result.dependency_evidence
         if e.match_kind is DependencyMatchKind.QUALIFIED_REFERENCE and e.line == 9
     )
     assert qualified_evidence.path == "app/order_service.py"
@@ -238,8 +239,7 @@ def test_pull_request_service_end_to_end_with_failure_planning() -> None:
                         category=FailureCategory.SCHEMA_CONTRACT_BREAK,
                         title="Dropped column remains referenced",
                         statement=(
-                            "orders.legacy_status is dropped but referenced in "
-                            "order_service.py"
+                            "orders.legacy_status is dropped but referenced in order_service.py"
                         ),
                         change_ids=[cid],
                         evidence_ids=[eid],

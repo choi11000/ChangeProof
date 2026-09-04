@@ -94,7 +94,7 @@ class OpenApiParser:
         depth: int = 0,
     ) -> tuple[dict[str, Any], str | None]:
         """Resolves $ref in schema.
-        
+
         Returns the resolved dictionary and the schema name if from components.
         """
         schema_name = None

@@ -164,6 +164,7 @@ def test_demo_identity_unconfigured_denied() -> None:
 
 def _api_change_fact() -> ChangeFact:
     from app.schemas.api_contract import ApiChange, ApiChangeType
+
     return ChangeFact(
         id="cf_api_1",
         domain="API",

@@ -1,14 +1,11 @@
 import asyncio
-import pytest
 
 from app.fixtures.shiftsafe_fixtures import (
-    ControlledPerformanceFixture,
     ControlledWeatherDependency,
     DownstreamMode,
     ShiftSafeApp,
     get_controlled_performance_fixture,
 )
-from app.schemas.performance import PerformanceExperimentConfig
 
 
 def test_shiftsafe_baseline_variant():

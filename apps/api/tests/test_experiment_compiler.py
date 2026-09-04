@@ -277,9 +277,10 @@ def test_compile_external_dependency_latency() -> None:
 
     plan = compiler.compile(hypothesis, [fact], [evidence])
     assert plan.template == ExperimentTemplate.EXTERNAL_DEPENDENCY_LATENCY
-    assert len(plan.steps) == 3
+    assert len(plan.steps) == 4
     assert plan.steps[0].type == ExperimentStepType.INITIALIZE_LOAD_ENVIRONMENT
-    assert plan.steps[1].type == ExperimentStepType.RUN_CONCURRENT_LOAD
-    assert plan.steps[1].concurrency == 150
-    assert plan.steps[2].type == ExperimentStepType.CAPTURE_PERFORMANCE_METRICS
+    assert plan.steps[1].type == ExperimentStepType.FUNCTIONAL_CHECK
+    assert plan.steps[2].type == ExperimentStepType.RUN_CONCURRENT_LOAD
+    assert plan.steps[2].concurrency == 150
+    assert plan.steps[3].type == ExperimentStepType.CAPTURE_PERFORMANCE_METRICS
     assert plan.plan_digest is not None

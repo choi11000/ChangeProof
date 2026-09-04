@@ -271,9 +271,7 @@ class PullRequestService:
         )
 
         # Summarize impact
-        impact_summary = summarize_impact(
-            targets, evidences, scan_complete=snapshot.scan_complete
-        )
+        impact_summary = summarize_impact(targets, evidences, scan_complete=snapshot.scan_complete)
         completed_steps.append(AnalysisStep.SUMMARIZE_IMPACT)
         self._log_step(
             AnalysisStep.SUMMARIZE_IMPACT,
