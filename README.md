@@ -1,183 +1,205 @@
 # ChangeProof
 
-> **Don't predict the failure. Reproduce it before production.**  
-> *Fix it, run the same experiment again, and prove the result.*
+**사용자가 몰리기 전에, 병목을 먼저 재현하세요.**  
+*(Reproduce the bottleneck before peak traffic does.)*
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Railway%20Production-blue?style=for-the-badge&logo=railway)](https://changeproof-web-production.up.railway.app)
-[![API Status](https://img.shields.io/badge/API-Online-success?style=for-the-badge)](https://changeproof-api-production.up.railway.app/api/v1/health)
-[![CI Status](https://img.shields.io/badge/CI-Passing%20(4%20Jobs)-brightgreen?style=for-the-badge&logo=githubactions)](https://github.com/choi11000/ChangeProof/actions)
-[![Test Coverage](https://img.shields.io/badge/Coverage-94.92%25-brightgreen?style=for-the-badge)](docs/technical-proof.md)
+ChangeProof analyzes software changes, identifies new peak-load risks, generates targeted load experiments with AI, and executes them in a controlled development environment before deployment.
 
-ChangeProof is an **Executable Change Verification Agent** (증거 기반 실행형 변경 검증 에이전트).  
-It turns database schema migrations in GitHub pull requests into deterministic facts, unchanged application dependency evidence, evidence-grounded AI failure hypotheses, isolated PostgreSQL sandbox reproductions (`PROVEN_FAIL`), and same-experiment compatibility remediation proofs (`PROVEN_FIXED`).
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Peak%20Load%20Proof-blue?style=for-the-badge&logo=railway)](https://changeproof-web-production.up.railway.app)
+[![CI Status](https://img.shields.io/badge/CI-Passing-brightgreen?style=for-the-badge&logo=githubactions)](https://github.com/choi11000/ChangeProof/actions)
+[![Test Coverage](https://img.shields.io/badge/Coverage-93.89%25-brightgreen?style=for-the-badge)](apps/api)
 
 ---
 
-## 🎯 Try the Live Demo in 30 Seconds
-
-* **Public Web Service**: [https://changeproof-web-production.up.railway.app](https://changeproof-web-production.up.railway.app)
-* **Official Demo PR**: [choi11000/changeproof-demo#1](https://github.com/choi11000/changeproof-demo/pull/1)
-
-### How to Run:
-1. Open the [Live Web Service](https://changeproof-web-production.up.railway.app).
-2. Click **'Live Demo 실행하기'** (or **'Run Live Demo'** in English); the configured demo analysis starts immediately.
-3. Review the `Proof Summary`, detected `DROP_COLUMN orders.legacy_status` fact, cross-layer dependency evidence in `app/order_service.py:11`, and the AI failure hypothesis.
-4. Click **'격리된 PostgreSQL에서 실험 실행 →'** (`Run experiment in isolated PostgreSQL`) to witness actual database execution failure (`SQLSTATE 42703 • undefined_column`) $\rightarrow$ **`PROVEN_FAIL`**.
-5. Click **'복구 검증 →'** (`Verify remediation`) to run the **exact same experiment contract** against compatibility-remediated code $\rightarrow$ **`PROVEN_FIXED`**.
-
----
-
-## ⚠️ The Problem: The Diff-Only Blindspot
-
-Modern code reviews and predictive AI code reviewers commonly answer:
-* *"What changed in this PR?"*
-* *"Does this look risky based on general patterns?"*
-
-**However, they cannot prove:**
-* *"Will this specific schema change break an unchanged application query at runtime?"*
+## 🎯 The Real Problem: The Peak-Load Blindspot
 
 ```text
-PR Migration Diff:
-+ ALTER TABLE orders DROP COLUMN legacy_status;
-
-Unchanged Application Source (NOT in the PR diff):
-  order_dict = {"id": order.id, "status": order.legacy_status}  <-- RUNTIME CRASH!
+Code / infrastructure change
+   ↓
+Functional test PASS (1 user, 15ms)
+   ↓
+Development environment appears completely healthy
+   ↓
+Production peak time arrives
+   ↓
+150 concurrent users hit the endpoint simultaneously
+   ↓
+New downstream dependency or lock contention amplifies latency
+   ↓
+Requests accumulate behind limited connection capacity
+   ↓
+Service experiences severe latency explosion (p95: 4.8s) or cascading timeouts
 ```
 
-Diff-only review can miss unchanged application dependencies, while speculative AI reviewers can only generate probabilistic risk signals without runtime observation.
+### The Typical Scenario
+Before change:
+```text
+GET /dashboard → database lookup (15ms) → response
+```
+
+After risky change:
+```text
+GET /dashboard → database lookup → WeatherClient.get_current() (700ms external) → response
+```
+
+* **Functional test**: **PASS** (15ms mock or single request succeeds normally).
+* **At 5 concurrent users**: Everything looks fine.
+* **At peak traffic (150 concurrent users)**: Outbound connection capacity (10) saturates, requests queue, p95 explodes from **180ms to 4,820ms**, and timeouts reach 18%.
 
 ---
 
-## 💡 How ChangeProof Works: From Guesswork to Proof
+## 💡 What ChangeProof Does: Change-Aware Load Verification
 
-ChangeProof replaces speculation with **reproduction**:
-
-1. **Deterministic Fact Extraction**: Parses SQL migrations with an AST parser (`sqlglot`) and scans the entire repository tree at the PR commit (`head_sha`) to discover references to dropped columns or tables.
-2. **Evidence-Grounded AI Planning**: Uses OpenAI Structured Outputs to propose concrete failure hypotheses and an allowlisted experiment template from verified facts and evidence. Hypotheses remain strictly `UNVERIFIED`; a deterministic compiler creates the executable 6-step plan.
-3. **Ephemeral PostgreSQL Execution**: Spawns an isolated ephemeral schema (`cp_run_<hex12>`), applies baseline schemas, loads seed data, applies the PR migration, and executes the dependent query. It captures physical database engine errors (`SQLSTATE 42703`) $\rightarrow$ **`PROVEN_FAIL`**.
-4. **Same-Experiment Remediation Proof**: Applies a backward-compatible remediation migration and re-executes the identical experiment contract digest (`contract_...`) against a changed subject. When the previously observed failure disappears (`PROVEN_PASS`), the deterministic verifier issues **`PROVEN_FIXED`** for that before/after experiment pair.
-
----
-
-## 🛡️ The 4-Layer Trust Model
-
-| Layer | Responsibility | Engine / Component | Trust Level | Output |
-| :--- | :--- | :--- | :--- | :--- |
-| **1. FACT** | SQL parsing & source dependency discovery | `sqlglot` AST & file indexer | 100% Deterministic | `ChangeFact`, `DependencyEvidence` |
-| **2. HYPOTHESIS** | Failure symptom & experiment plan mapping | OpenAI `gpt-4o-mini` (Structured Outputs) | Bounded AI reasoning | `FailureHypothesis` (`UNVERIFIED`) |
-| **3. OBSERVATION** | Sandbox migration & query execution | Ephemeral PostgreSQL 17 (`psycopg`) | Real DB Engine | `SQLSTATE 42703`, Step traces |
-| **4. VERDICT & PROOF** | Contract digest & invariance verification | Deterministic proof verifier | 100% Deterministic | `PROVEN_FAIL`, `PROVEN_FIXED` |
-
-> **Crucial Boundary**: AI **never** decides whether a change is safe and never executes arbitrary SQL or shell commands. PostgreSQL supplies observations; the deterministic verifier alone issues verdicts.
+ChangeProof is an **AI Test Agent** that reads **WHAT CHANGED** and compiles **WHAT NEW LOAD EXPERIMENT** should be executed because of that specific change.
 
 ```text
-DETERMINISTIC ANALYSIS = FACT
-OPENAI = HYPOTHESIS
-POSTGRESQL = OBSERVATION
-DETERMINISTIC VERIFIER = VERDICT
+Code Change
+   ↓
+Deterministic Risk Facts (FastAPI route + external client call added to hot path)
+   ↓
+AI Risk Scenario Planner (OpenAI hypothesis: PROPOSED / UNVERIFIED)
+   ↓
+Deterministic Load Compiler (Bounded concurrency, safety caps)
+   ↓
+ChangeProof Runner (Async concurrent load generator)
+   ↓
+Runtime Observations (DOWNSTREAM_QUEUE_AMPLIFICATION, p95 4,820ms, timeouts 18%)
+   ↓
+Deterministic Bottleneck Verdict (PROVEN_BOTTLENECK)
+   ↓
+Remediation Applied (10s TTL Cache + Request Coalescing + 1.5s Timeout)
+   ↓
+SAME Load Experiment Executed (Identical contract digest, 150 concurrent users)
+   ↓
+Deterministic Recovery Verdict (PROVEN_RECOVERED, p95 310ms, timeouts 0%)
+```
 
-SAME EXPERIMENT
+---
+
+## ⚡ Live Demo (ShiftSafe Workforce Safety Service)
+
+Experience the 10-second instant visual contrast in the web application:
+
+1. **Service**: Synthetic workforce safety dashboard (`GET /dashboard`).
+2. **Functional Test**: `PASS (200 OK, 15ms)`.
+3. **Risky Change**: Synchronous external `WeatherClient.get_current()` call added directly to the dashboard request path.
+4. **Click "피크 트래픽 재현 실행"** (Run Peak Load):
+   * 150 concurrent users, 300 requests, controlled 700ms downstream delay, capacity 10.
+   * **Result**: p95 spikes to **4,820 ms**, 18% timeouts $\rightarrow$ **`PROVEN_BOTTLENECK`** (`DOWNSTREAM_QUEUE_AMPLIFICATION`).
+5. **Click "수정 적용 및 동일 부하 재실행"** (Verify Recovery under Same Load):
+   * Applies cache + coalescing + 1.5s timeout.
+   * Re-executes the **exact same 150-user load scenario**.
+   * **Result**: p95 drops to **310 ms**, 0% timeouts $\rightarrow$ **`PROVEN_RECOVERED`** (`CONTRACT SAME: YES`, `CHANGED SUBJECT: YES`).
+
+---
+
+## 🖥️ Local Runner Agent (`apps/runner`)
+
+In enterprise environments with private repositories, DLP, DRM, or internal staging services unreachable from public SaaS, ChangeProof runs directly inside developer networks:
+
+```bash
+# 1. Install local runner
+pip install -e apps/runner
+
+# 2. Inspect local Git diff for performance risks
+changeproof inspect --repo . --base HEAD~1
+
+# 3. Verify peak load against local/dev environment
+changeproof verify --base HEAD~1 --target http://localhost:8001
+
+# 4. Output machine-readable JSON for CI/CD gates
+changeproof verify --base HEAD~1 --target http://192.168.1.50:8001 --json
+```
+
+---
+
+## ❓ Why Not Just k6, JMeter, or Gatling?
+
+> **k6, JMeter, Gatling, and Locust are excellent load execution tools.**
+
+ChangeProof focuses on a fundamentally different question:
+* Existing tools ask: *"How many requests per second can this endpoint handle?"*
+* **ChangeProof asks**: *"Given **THIS CODE CHANGE**, what **NEW** load scenario should we run?"*
+
+Without ChangeProof, developers must manually hypothesize bottlenecks, script synthetic traffic, and maintain test scenarios for every PR. ChangeProof uses deterministic change facts and bounded AI reasoning to design the right experiment for the released diff automatically.
+
+---
+
+## ❓ Why Not Just ChatGPT?
+
+A chat model can offer generic advice like *"Adding external API calls may cause latency under load."*
+
+ChangeProof connects that reasoning to:
+1. **Local code changes** in Git diffs.
+2. **Controlled load scenarios** compiled deterministically.
+3. **Actual concurrent execution** collecting per-request percentiles.
+4. **Deterministic threshold verdicts** (`PROVEN_BOTTLENECK`).
+5. **Same-experiment remediation proofs** (`PROVEN_RECOVERED`).
+
+The value is the verified end-to-end workflow, not a chat suggestion.
+
+---
+
+## 🤖 The AI Role
+
+OpenAI is strictly an **information synthesis and hypothesis authority**:
+* **Generates**: Probable risk mechanisms, scenario classes, and explanations of why unit tests missed the issue.
+* **Status**: Hypotheses always remain **`PROPOSED / UNVERIFIED`**.
+* **AI never determines verdicts** and **never writes executable load scripts, shell commands, or arbitrary target URLs**.
+* The deterministic compiler clamps all load parameters, and the deterministic verifier alone evaluates runtime metrics against invariant thresholds.
+
+---
+
+## 🛡️ Technical Trust Model
+
+```text
+DETERMINISTIC CHANGE ANALYSIS = FACT
+OPENAI = PERFORMANCE HYPOTHESIS (PROPOSED / UNVERIFIED)
+CONTROLLED LOAD RUNNER = OBSERVATION
+DETERMINISTIC THRESHOLD VERIFIER = VERDICT
+
+SAME LOAD EXPERIMENT
 - CHANGED SUBJECT
-- FAIL → PASS
-= PROOF
-```
-
-`PROVEN_PASS` means the expected failure was not observed in that controlled experiment. It does not establish that the entire pull request or production system is safe.
-
-> This proof applies to this controlled experiment, not to the entire pull request or production system.
-
----
-
-## 🏛️ System Architecture
-
-```mermaid
-flowchart TD
-    subgraph S1["1. Deterministic Facts"]
-        A["GitHub Pull Request"] --> B["SQL Change Parser"] --> C["Change Facts"]
-        A --> D["Dependency Discovery Engine"] --> E["Dependency Evidence"]
-    end
-
-    subgraph S2["2. Bounded AI Reasoning"]
-        C & E --> F["OpenAI Structured Outputs"] --> G["Failure Hypothesis (UNVERIFIED)"]
-        G --> H["Experiment Compiler"] --> I["Deterministic Experiment Plan"]
-    end
-
-    subgraph S3["3. Real PostgreSQL Sandbox"]
-        I --> J["Ephemeral Schema (cp_run_*)"] --> K["Observation: SQLSTATE 42703"]
-    end
-
-    subgraph S4["4. Deterministic Proof"]
-        K --> L["Deterministic Verifier"] --> M["Verdict: PROVEN_FAIL"]
-        M --> N["Compatibility Remediation"] --> O["Same Experiment Contract"] --> P["Verdict: PROVEN_FIXED"]
-    end
-
-    classDef fact fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc;
-    classDef hypo fill:#1e293b,stroke:#fbbf24,stroke-width:2px,color:#f8fafc;
-    classDef obs fill:#1e293b,stroke:#f87171,stroke-width:2px,color:#f8fafc;
-    classDef proof fill:#1e293b,stroke:#4ade80,stroke-width:2px,color:#f8fafc;
-
-    class S1,C,E fact;
-    class S2,G,I hypo;
-    class S3,K obs;
-    class S4,M,P proof;
+- FAIL → PASS (p95: 4820ms → 310ms)
+= PROOF (PROVEN_RECOVERED)
 ```
 
 ---
 
-## 📦 Implemented Scope & Roadmap
+## 🔒 Security Boundaries
 
-### Implemented Verticals
-* **Database Schema Changes**: PostgreSQL DDL migrations (`DROP_COLUMN`, `DROP_TABLE`, `ALTER_COLUMN_TYPE`, `NOT NULL`, `DEFAULT`). Deterministic `sqlglot` AST parsing, cross-layer application code dependency discovery, ephemeral schema sandbox execution, exact `SQLSTATE 42703` observation, and `PROVEN_FAIL` → `PROVEN_FIXED` remediation proof.
-* **API Contract Changes**: OpenAPI 3.x specifications (`openapi.yaml`, `openapi.yml`, `openapi.json`). Deterministic base-vs-head diffing for `REMOVE_RESPONSE_FIELD`, consumer client dependency discovery (`response["field"]`), in-process Starlette ASGI controlled runtime, exact `API_MISSING_RESPONSE_FIELD` observation, and same-experiment compatibility remediation proof.
-* **Source & Pull Requests**: GitHub public repositories and pull requests with exact demo authorization guardrails.
-* **Security & Isolation**: Zero arbitrary repository execution (no `npm/pip install`, no shell/subprocess, no external network egress).
-
-### Future Roadmap (PLANNED)
-* **Supply-chain behavioral proof** (process, network, filesystem isolation) — *FUTURE*
-* **Event & Message Schema breaking changes** (Kafka, Protobuf, Avro) — *FUTURE*
-* **Infrastructure & Configuration contract validation** — *FUTURE*
-* **Additional Database engines** (MySQL, SQLite) — *FUTURE*
+To prevent abuse or unintentional disruption:
+* **Max Concurrency**: Clamped to 150 (demo) / 200 (runner max).
+* **Max Requests**: Clamped to 300 (demo) / 1000 (runner max).
+* **Target Environment Restrictions**:
+  * Public web demo executes **only against server-owned controlled synthetic fixtures**.
+  * Local Runner **strictly restricts execution to `localhost` and RFC1918 private subnets** (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`).
+  * Arbitrary public domains and public IP addresses are rejected with `TargetSecurityError`.
+* **Zero Code Exfiltration**: Raw repository source code remains local; only bounded change facts leave the environment.
 
 ---
 
-## 💻 Local Development
+## 📦 Compatibility Proofs (Secondary Vertical)
 
-Prerequisites: Docker Desktop with Compose v2, Python 3.11+, Node.js 20+.
+ChangeProof also preserves its deep contract verification vertical under the secondary **Compatibility Proofs** tab:
+* **Database Schema Contract Proof**: Discovers unchanged application queries referencing dropped PostgreSQL columns and reproduces engine failure (`SQLSTATE 42703 • undefined_column` $\rightarrow$ `PROVEN_FAIL` $\rightarrow$ `PROVEN_FIXED`).
+* **API Contract Proof**: Detects removed fields from OpenAPI specifications and proves client breakage under ASGI execution (`API_MISSING_RESPONSE_FIELD` $\rightarrow$ `PROVEN_FAIL` $\rightarrow$ `PROVEN_FIXED`).
+
+---
+
+## 🧪 Testing & Verification
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/choi11000/ChangeProof.git
-cd ChangeProof
+# Backend unit & integration suite (208 tests, 93.89% coverage)
+cd apps/api
+pytest --cov=app --cov-report=term-missing
 
-# 2. Configure environment
-cp .env.example .env
+# Local runner agent suite (4 tests)
+cd apps/runner
+pytest
 
-# 3. Start API, Web, and Sandbox PostgreSQL
-docker compose --profile sandbox up --build -d
+# Frontend vitest suite (5 tests) & Next.js production build
+cd apps/web
+npm test -- --run
+npm run build
 ```
-
-Access:
-* Web UI: `http://localhost:3000`
-* API Docs: `http://localhost:8000/docs`
-* API Health: `http://localhost:8000/api/v1/health`
-
-To run automated tests:
-```bash
-# Backend pytest suite (176 tests, 94.9% coverage)
-cd apps/api && pytest -v --cov=app
-
-# Frontend Vitest suite (6 tests)
-cd ../web && npm test
-```
-
----
-
-## 📑 Documentation
-
-* [Wanted AI Championship 2026 Submission Document](docs/wanted-submission.md)
-* [Submission Checklist](docs/wanted-submission-checklist.md)
-* [Technical Proof Sheet](docs/technical-proof.md)
-* [Architecture & Trust Model](docs/architecture-submission.md)
-* [100-Second Demo Video Script](docs/demo-video-script.md)
-* [Release Freeze Declaration](docs/release-freeze.md)
-* [TOP20 Demo Day Outline](docs/demo-day-outline.md)
