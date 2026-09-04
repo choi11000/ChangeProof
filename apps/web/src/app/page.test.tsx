@@ -405,4 +405,209 @@ describe("Home", () => {
     expect(screen.getByText(/동일 실험: 예/i)).toBeInTheDocument();
     expect(screen.getByText(/대상 변경: 예/i)).toBeInTheDocument();
   });
+
+  it("selects API demo, analyzes breaking contract, and verifies PROVEN_FAIL to PROVEN_FIXED", async () => {
+    vi.stubEnv("NEXT_PUBLIC_DEMO_REPOSITORY", "choi11000/changeproof-demo");
+    vi.stubEnv("NEXT_PUBLIC_DEMO_PR", "1");
+    vi.stubEnv("NEXT_PUBLIC_API_DEMO_REPOSITORY", "choi11000/changeproof-api-demo");
+    vi.stubEnv("NEXT_PUBLIC_API_DEMO_PR", "1");
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    // 1. Analysis API response for API contract breaking PR
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          pull_request: {
+            number: 1,
+            title: "Remove email field from User response",
+            changed_files: 1,
+            html_url: "https://github.com/choi11000/changeproof-api-demo/pull/1",
+          },
+          domain: "API",
+          changed_files: [
+            { category: "OPENAPI_SPEC", reason: "OpenAPI contract spec", file: { path: "openapi.yaml" } },
+          ],
+          sql_files: [],
+          api_files: [
+            {
+              path: "openapi.yaml",
+              status: "modified",
+              changes: [
+                {
+                  change_type: "REMOVE_RESPONSE_FIELD",
+                  method: "GET",
+                  path: "/users/{id}",
+                  status_code: 200,
+                  media_type: "application/json",
+                  field_name: "email",
+                  schema_name: "User",
+                },
+              ],
+              error: null,
+            },
+          ],
+          dependency_targets: [
+            { type: "API_FIELD", table: "", path: "/users/{id}", field: "email", change_ids: ["api_1"] },
+          ],
+          dependency_evidence: [
+            {
+              id: "ev_api_1",
+              target: { type: "API_FIELD", table: "", path: "/users/{id}", field: "email" },
+              path: "client/user_client.py",
+              line: 14,
+              match_kind: "DIRECT_RESPONSE_FIELD_REFERENCE",
+              excerpt: 'return response["email"].lower()',
+              source_scope: "APPLICATION",
+              changed_in_pull_request: false,
+            },
+          ],
+          impact_summary: {
+            targets: 1,
+            application_files_with_references: 1,
+            test_files_with_references: 0,
+            qualified_references: 1,
+            contextual_references: 0,
+            identifier_references: 0,
+            scan_complete: true,
+          },
+          failure_hypotheses: [
+            {
+              id: "hyp_api_1",
+              category: "API_CONTRACT_BREAK",
+              title: "Removed response field email breaks unchanged consumer",
+              statement: "Consumer reads response['email'] which was removed",
+              change_ids: ["api_1"],
+              evidence_ids: ["ev_api_1"],
+              rationale: "Consumer directly accesses removed field",
+              expected_failure_mode: "KeyError on email field",
+              assumptions: [],
+              experiment_template: "API_RESPONSE_FIELD_COMPATIBILITY",
+              status: "UNVERIFIED",
+            },
+          ],
+          experiment_plans: [
+            {
+              id: "plan_api_1",
+              hypothesis_id: "hyp_api_1",
+              template: "API_RESPONSE_FIELD_COMPATIBILITY",
+              change_ids: ["api_1"],
+              evidence_ids: ["ev_api_1"],
+              steps: [
+                { order: 1, type: "PREPARE_API_ENVIRONMENT", description: "Initialize ASGI" },
+                { order: 2, type: "SEND_HTTP_REQUEST", description: "Send GET /users/1" },
+                { order: 3, type: "PROBE_RESPONSE_FIELD", description: "Probe email" },
+                { order: 4, type: "CAPTURE_API_RESULT", description: "Capture result" },
+              ],
+              expected_observation: "API_MISSING_RESPONSE_FIELD",
+              status: "PLANNED",
+            },
+          ],
+          execution_allowed: true,
+          controlled_fixture_id: "api-contract/remove-user-email",
+          warnings: [],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    // 2. Experiment run response (PROVEN_FAIL)
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          run: {
+            id: "run_api_01",
+            experiment_plan_id: "plan_api_1",
+            experiment_contract_digest: "contract_api_123456",
+            subject_digest: "subject_api_changed",
+            template: "API_RESPONSE_FIELD_COMPATIBILITY",
+            domain: "API",
+            verdict: "PROVEN_FAIL",
+            started_at: "2026-09-04T00:00:00Z",
+            finished_at: "2026-09-04T00:00:01Z",
+            step_results: [
+              { order: 1, type: "PREPARE_API_ENVIRONMENT", status: "PASSED", duration_ms: 2 },
+              { order: 2, type: "SEND_HTTP_REQUEST", status: "PASSED", duration_ms: 5, http_status: 200 },
+              {
+                order: 3,
+                type: "PROBE_RESPONSE_FIELD",
+                status: "FAILED",
+                duration_ms: 3,
+                observation_code: "API_MISSING_RESPONSE_FIELD",
+                json_pointer: "/email",
+                message: "Field 'email' missing from response payload",
+              },
+              { order: 4, type: "CAPTURE_API_RESULT", status: "PASSED", duration_ms: 1 },
+            ],
+            summary: "Failure reproduced: API_MISSING_RESPONSE_FIELD",
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    // 3. Remediation proof response (PROVEN_FIXED)
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          proof: {
+            id: "proof_api_01",
+            fixture_id: "api-contract/remove-user-email",
+            remediation_id: "remediation/api-contract/remove-user-email",
+            domain: "API",
+            strategy: "PRESERVE_API_RESPONSE_FIELD_COMPATIBILITY",
+            description: "Preserve the removed 'email' response field",
+            experiment_contract_digest: "contract_api_123456",
+            before: {
+              id: "run_api_01",
+              verdict: "PROVEN_FAIL",
+              step_results: [],
+            },
+            after: {
+              id: "run_api_02",
+              verdict: "PROVEN_PASS",
+              step_results: [],
+            },
+            verdict: "PROVEN_FIXED",
+            same_experiment: true,
+            subject_changed: true,
+            summary: "PROVEN_FIXED via same ASGI experiment",
+            scope_notice: "Verified on controlled ASGI fixture",
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    renderHome();
+
+    // Select the API demo tab
+    const apiDemoTab = screen.getByRole("button", { name: /\[ API 계약 \(OpenAPI\) \]/i });
+    expect(apiDemoTab).toBeInTheDocument();
+    fireEvent.click(apiDemoTab);
+
+    // Click Live Demo button
+    const liveDemoBtn = screen.getByRole("button", { name: /live demo 실행하기/i });
+    fireEvent.click(liveDemoBtn);
+
+    // Wait for analysis result to appear with API Contract domain badge
+    await waitFor(() => expect(screen.getByText("API 계약")).toBeInTheDocument());
+    expect(screen.getByText(/REMOVE_RESPONSE_FIELD GET \/users\/\{id\} \(email\)/i)).toBeInTheDocument();
+
+    // Run experiment
+    const runExpBtn = screen.getByRole("button", { name: /실험 실행/i });
+    fireEvent.click(runExpBtn);
+
+    // Wait for failure reproduction observation
+    await waitFor(() => expect(screen.getByText("API_MISSING_RESPONSE_FIELD")).toBeInTheDocument());
+    expect(screen.getByText("PROVEN_FAIL")).toBeInTheDocument();
+
+    // Click remediation verification button
+    const verifyBtn = screen.getByRole("button", { name: /복구 검증/i });
+    fireEvent.click(verifyBtn);
+
+    // Verify PROVEN_FIXED
+    await waitFor(() => expect(screen.getByText("PROVEN_FIXED")).toBeInTheDocument());
+    expect(screen.getByText("FAIL → PASS")).toBeInTheDocument();
+  });
 });

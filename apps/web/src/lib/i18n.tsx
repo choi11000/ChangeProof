@@ -40,6 +40,14 @@ export interface Translations {
   loadDemoBtn: string;
   demoHint: string;
   demoScenario: string;
+  databaseDemoTabTitle: string;
+  databaseDemoTabDesc: string;
+  apiDemoTabTitle: string;
+  apiDemoTabDesc: string;
+  apiDemoHint: string;
+  apiDemoScenario: string;
+  domainDatabase: string;
+  domainApi: string;
   orDivider: string;
   manualAnalysisLabel: string;
 
@@ -52,6 +60,7 @@ export interface Translations {
   summaryDependencyFound: string;
   summaryDependencyPending: string;
   summaryObservationLabel: string;
+  summaryObservationApiLabel: string;
   summaryObservationPending: string;
   summaryVerdictLabel: string;
   summaryVerdictPending: string;
@@ -177,6 +186,14 @@ export const translations: Record<Language, Translations> = {
     loadDemoBtn: "Live Demo 실행하기",
     demoHint: "검증된 실패 데모를 직접 실행해 보세요",
     demoScenario: "DROP COLUMN → 숨은 의존성 → SQLSTATE 42703",
+    databaseDemoTabTitle: "데이터베이스 스키마",
+    databaseDemoTabDesc: "DROP COLUMN → PostgreSQL (42703)",
+    apiDemoTabTitle: "API 계약 (OpenAPI)",
+    apiDemoTabDesc: "REMOVE_RESPONSE_FIELD → ASGI",
+    apiDemoHint: "API 계약 파괴적 변경 데모를 실행해 보세요",
+    apiDemoScenario: "GET /users/{id} 응답 'email' 필드 제거 → 소비자 직접 참조 실패",
+    domainDatabase: "데이터베이스",
+    domainApi: "API 계약",
     orDivider: "또는",
     manualAnalysisLabel: "GitHub 저장소와 PR을 직접 분석",
 
@@ -189,6 +206,7 @@ export const translations: Record<Language, Translations> = {
     summaryDependencyFound: "숨은 애플리케이션 참조 발견",
     summaryDependencyPending: "참조 증거 없음",
     summaryObservationLabel: "PostgreSQL 관측",
+    summaryObservationApiLabel: "API 런타임 관측",
     summaryObservationPending: "격리 실험 실행 대기",
     summaryVerdictLabel: "결정론적 판정",
     summaryVerdictPending: "PENDING",
@@ -313,6 +331,14 @@ export const translations: Record<Language, Translations> = {
     loadDemoBtn: "Run Live Demo",
     demoHint: "Try the proven failure demo",
     demoScenario: "DROP COLUMN → hidden dependency → SQLSTATE 42703",
+    databaseDemoTabTitle: "Database Schema",
+    databaseDemoTabDesc: "DROP COLUMN → PostgreSQL (42703)",
+    apiDemoTabTitle: "API Contract (OpenAPI)",
+    apiDemoTabDesc: "REMOVE_RESPONSE_FIELD → ASGI",
+    apiDemoHint: "Try the API contract breaking change demo",
+    apiDemoScenario: "GET /users/{id} response field 'email' removed → consumer direct reference fails",
+    domainDatabase: "Database",
+    domainApi: "API Contract",
     orDivider: "or",
     manualAnalysisLabel: "Analyze a GitHub repository and pull request manually",
 
@@ -325,7 +351,8 @@ export const translations: Record<Language, Translations> = {
     summaryDependencyFound: "Hidden application reference found",
     summaryDependencyPending: "No reference evidence",
     summaryObservationLabel: "PostgreSQL observation",
-    summaryObservationPending: "Waiting for isolated experiment",
+    summaryObservationApiLabel: "API runtime observation",
+    summaryObservationPending: "Isolated experiment pending",
     summaryVerdictLabel: "Deterministic verdict",
     summaryVerdictPending: "PENDING",
     scopeInvariant: "This proof applies to this controlled experiment, not to the entire pull request or production system.",
@@ -492,6 +519,8 @@ export function translateTemplate(template: string, lang: Language): string {
       return "컬럼 타입 변경 호환성 검증 (ALTER_TYPE_COMPATIBILITY)";
     case "MIGRATION_APPLY":
       return "마이그레이션 적용 검증 (MIGRATION_APPLY)";
+    case "API_RESPONSE_FIELD_COMPATIBILITY":
+      return "API 응답 필드 호환성 검증 (API_RESPONSE_FIELD_COMPATIBILITY)";
     default:
       return template;
   }
@@ -534,6 +563,14 @@ export function translateStepType(stepType: string, lang: Language): string {
       return "동시 트랜잭션 실행 (RUN_CONCURRENT_TRANSACTION)";
     case "CAPTURE_RESULT":
       return "결과 관측 (CAPTURE_RESULT)";
+    case "PREPARE_API_ENVIRONMENT":
+      return "인프로세스 ASGI API 환경 준비 (PREPARE_API_ENVIRONMENT)";
+    case "SEND_HTTP_REQUEST":
+      return "HTTP 요청 전송 (SEND_HTTP_REQUEST)";
+    case "PROBE_RESPONSE_FIELD":
+      return "소비자 필드 프로브 실행 (PROBE_RESPONSE_FIELD)";
+    case "CAPTURE_API_RESULT":
+      return "API 결과 관측 (CAPTURE_API_RESULT)";
     default:
       return stepType;
   }
@@ -583,6 +620,19 @@ export function translateStepDescription(description: string, lang: Language): s
   if (/^Capture database response/i.test(description)) {
     return "데이터베이스 응답 캡처 및 결과 관측";
   }
+  if (/^Initialize in-process ASGI provider environment/i.test(description)) {
+    return "인프로세스 ASGI 프로바이더 환경 초기화";
+  }
+  if (/^Send (GET|POST|PUT|DELETE|PATCH) request to/i.test(description)) {
+    return `${description} (ASGI Transport)`;
+  }
+  if (/^Run consumer probe verifying required field '([^']+)'/i.test(description)) {
+    const field = description.match(/'([^']+)'/)?.[1] ?? "field";
+    return `필수 응답 필드 '${field}'에 대한 소비자 프로브 실행`;
+  }
+  if (/^Capture API response/i.test(description)) {
+    return "API 응답 상태 및 누락 필드 관측 결과 캡처";
+  }
   return description;
 }
 
@@ -595,6 +645,10 @@ export function translateObservation(observation: string, lang: Language): strin
   if (/fail with undefined column/i.test(observation)) {
     return "정의되지 않은 컬럼 오류(undefined_column)로 쿼리 실행 실패 예상";
   }
+  if (/fail with missing response field error on '([^']+)'/i.test(observation)) {
+    const field = observation.match(/'([^']+)'/)?.[1] ?? "field";
+    return `응답에서 필수 필드 '${field}'가 누락되어 소비자 프로브 실행 실패 예상`;
+  }
   return observation;
 }
 
@@ -605,8 +659,14 @@ export function translateRunSummary(summary: string, lang: Language): string {
   ) {
     return "격리된 PostgreSQL에서 장애 재현 성공: 마이그레이션에 의해 컬럼이 삭제되었으며, 참조 쿼리 실행 시 SQLSTATE 42703 (undefined_column: column does not exist) 오류가 발생했습니다.";
   }
+  if (/API_MISSING_RESPONSE_FIELD/i.test(summary) || /missing from response payload/i.test(summary)) {
+    return "통제된 API 런타임에서 장애 재현 성공: 응답에 필수 필드가 누락되어 소비자 프로브가 실패했습니다 (API_MISSING_RESPONSE_FIELD).";
+  }
   if (/Failure reproduced/i.test(summary)) {
-    return "격리된 PostgreSQL에서 장애가 재현되었습니다.";
+    return "격리된 환경에서 장애가 재현되었습니다.";
+  }
+  if (/Consumer probe passed/i.test(summary)) {
+    return "통제된 API 런타임 검증 성공: 필수 응답 필드가 존재하여 소비자 프로브가 정상 통과했습니다.";
   }
   if (/Verification passed/i.test(summary)) {
     return "복구 적용 후 검증을 통과했습니다.";
@@ -618,6 +678,10 @@ export function translateRemediationDescription(desc: string, lang: Language): s
   if (lang !== "ko") return desc;
   if (/Preserve legacy_status during the compatibility window/i.test(desc)) {
     return "새로운 status 컬럼을 도입하는 호환성 유지 기간 동안 legacy_status 컬럼을 보존하여 구버전 코드 호환성을 유지합니다.";
+  }
+  if (/Preserve the removed '([^']+)' response field/i.test(desc)) {
+    const field = desc.match(/'([^']+)'/)?.[1] ?? "field";
+    return `클라이언트 호환성 보장을 위해 제거되었던 '${field}' 응답 필드를 복구하여 하위 호환성을 유지합니다.`;
   }
   return desc;
 }

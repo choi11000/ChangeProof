@@ -19,6 +19,7 @@ import {
 type FileCategory =
   | "SQL_MIGRATION"
   | "DATABASE_SCHEMA"
+  | "OPENAPI_SPEC"
   | "APPLICATION"
   | "CONFIG"
   | "TEST"
@@ -29,12 +30,15 @@ type DependencyMatchKind =
   | "QUALIFIED_REFERENCE"
   | "TABLE_AND_COLUMN_CONTEXT"
   | "COLUMN_IDENTIFIER"
-  | "TABLE_IDENTIFIER";
+  | "TABLE_IDENTIFIER"
+  | "DIRECT_RESPONSE_FIELD_REFERENCE";
 
 type DependencyTarget = {
-  type: "TABLE" | "COLUMN";
+  type: "TABLE" | "COLUMN" | "API_ENDPOINT" | "API_FIELD";
   table: string;
   column?: string | null;
+  path?: string | null;
+  field?: string | null;
   change_ids?: string[];
 };
 
@@ -71,6 +75,7 @@ type FailureCategory =
   | "NULLABILITY_COMPATIBILITY"
   | "TYPE_COMPATIBILITY"
   | "TABLE_CONTRACT_BREAK"
+  | "API_CONTRACT_BREAK"
   | "OTHER";
 
 type ExperimentTemplate =
@@ -78,7 +83,8 @@ type ExperimentTemplate =
   | "DROPPED_COLUMN_REFERENCE"
   | "DROPPED_TABLE_REFERENCE"
   | "NOT_NULL_COMPATIBILITY"
-  | "ALTER_TYPE_COMPATIBILITY";
+  | "ALTER_TYPE_COMPATIBILITY"
+  | "API_RESPONSE_FIELD_COMPATIBILITY";
 
 type FailureHypothesis = {
   id: string;
@@ -102,7 +108,11 @@ type ExperimentStepType =
   | "RUN_READ_QUERY"
   | "RUN_WRITE_MUTATION"
   | "RUN_CONCURRENT_TRANSACTION"
-  | "CAPTURE_RESULT";
+  | "CAPTURE_RESULT"
+  | "PREPARE_API_ENVIRONMENT"
+  | "SEND_HTTP_REQUEST"
+  | "PROBE_RESPONSE_FIELD"
+  | "CAPTURE_API_RESULT";
 
 type ExperimentStep = {
   order: number;
@@ -129,6 +139,9 @@ type ExperimentStepResult = {
   status: "PASSED" | "FAILED" | "SKIPPED";
   duration_ms: number;
   sql_state?: string | null;
+  observation_code?: string | null;
+  json_pointer?: string | null;
+  http_status?: number | null;
   message?: string | null;
 };
 
@@ -138,6 +151,7 @@ type ExperimentRun = {
   experiment_contract_digest: string;
   subject_digest: string;
   template: ExperimentTemplate;
+  domain?: "DATABASE" | "API";
   verdict: "PROVEN_FAIL" | "PROVEN_PASS" | "INCONCLUSIVE" | "EXECUTION_ERROR";
   started_at: string;
   finished_at: string;
@@ -150,6 +164,7 @@ type RemediationProof = {
   id: string;
   fixture_id: string;
   remediation_id: string;
+  domain?: "DATABASE" | "API";
   strategy: string;
   description: string;
   experiment_contract_digest: string;
@@ -176,6 +191,23 @@ type AnalysisResult = {
     };
     error: string | null;
   }>;
+  api_files?: Array<{
+    path: string;
+    status: string;
+    content_sha?: string | null;
+    changes: Array<{
+      change_type: string;
+      method: string;
+      path: string;
+      status_code: number;
+      media_type: string;
+      field_name: string;
+      schema_name?: string | null;
+      json_pointer?: string | null;
+    }>;
+    error: string | null;
+  }>;
+  domain?: "DATABASE" | "API";
   dependency_targets: DependencyTarget[];
   dependency_evidence: DependencyEvidence[];
   impact_summary: ImpactSummary | null;
@@ -196,6 +228,8 @@ function matchKindLabel(
   switch (kind) {
     case "QUALIFIED_REFERENCE":
       return { label: t.matchDirect, className: "badge badge-direct" };
+    case "DIRECT_RESPONSE_FIELD_REFERENCE":
+      return { label: t.matchDirect, className: "badge badge-direct" };
     case "TABLE_AND_COLUMN_CONTEXT":
       return { label: t.matchContext, className: "badge badge-context" };
     case "COLUMN_IDENTIFIER":
@@ -209,6 +243,7 @@ function matchKindLabel(
 
 export function AnalysisForm() {
   const { t, lang } = useI18n();
+  const [selectedDemo, setSelectedDemo] = useState<"database" | "api">("database");
   const [repository, setRepository] = useState("");
   const [pullRequest, setPullRequest] = useState("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -221,20 +256,34 @@ export function AnalysisForm() {
   const [executionError, setExecutionError] = useState<string | null>(null);
   const [provingPlanId, setProvingPlanId] = useState<string | null>(null);
   const [remediationProofs, setRemediationProofs] = useState<Record<string, RemediationProof>>({});
+
   const demoRepository = process.env.NEXT_PUBLIC_DEMO_REPOSITORY?.trim() ?? "";
   const demoPullRequest = process.env.NEXT_PUBLIC_DEMO_PR?.trim() ?? "";
   const demoConfigured =
     demoRepository.length > 0 && /^\d+$/.test(demoPullRequest) && Number(demoPullRequest) > 0;
 
+  const dbDemoRepo = demoRepository || "choi11000/changeproof-demo";
+  const dbDemoPR = demoPullRequest || "1";
+
+  const apiDemoRepo =
+    process.env.NEXT_PUBLIC_API_DEMO_REPOSITORY?.trim() || "choi11000/changeproof-api-demo";
+  const apiDemoPR = process.env.NEXT_PUBLIC_API_DEMO_PR?.trim() || "1";
+
   const counts = useMemo(() => {
     const files = result?.changed_files ?? [];
     return {
       sql: files.filter((item) => item.category === "SQL_MIGRATION").length,
+      api: (result?.api_files ?? []).length,
       application: files.filter((item) => item.category === "APPLICATION").length,
-      changes: (result?.sql_files ?? []).reduce(
-        (total, file) => total + (file.analysis?.changes.length ?? 0),
-        0,
-      ),
+      changes:
+        (result?.sql_files ?? []).reduce(
+          (total, file) => total + (file.analysis?.changes.length ?? 0),
+          0,
+        ) +
+        (result?.api_files ?? []).reduce(
+          (total, file) => total + (file.changes?.length ?? 0),
+          0,
+        ),
     };
   }, [result]);
 
@@ -245,31 +294,49 @@ export function AnalysisForm() {
   const summary = useMemo(() => {
     if (!result) return null;
 
-    const change = result.sql_files
+    const isApi =
+      result.domain === "API" ||
+      ((result.api_files ?? []).length > 0 && (result.sql_files ?? []).length === 0);
+    const apiChange = result.api_files?.flatMap((file) => file.changes ?? []).at(0);
+    const dbChange = result.sql_files
       .flatMap((file) => file.analysis?.changes ?? [])
       .at(0);
     const run = primaryRun;
     const proof = primaryProof;
     const failedStep = run?.step_results.find((step) => step.status === "FAILED");
-    const changeTarget = change
-      ? [change.table, change.column].filter(Boolean).join(".")
+    const changeTarget = dbChange
+      ? [dbChange.table, dbChange.column].filter(Boolean).join(".")
       : "";
 
+    let changeText = t.summaryChangePending;
+    if (isApi && apiChange) {
+      changeText = `${apiChange.change_type} ${apiChange.method} ${apiChange.path} (${apiChange.field_name})`;
+    } else if (dbChange) {
+      changeText = `${dbChange.operation}${changeTarget ? ` ${changeTarget}` : ""}`;
+    }
+
+    let obsText = t.summaryObservationPending;
+    if (proof) {
+      obsText = "FAIL → PASS";
+    } else if (run) {
+      if (failedStep?.observation_code) {
+        obsText = failedStep.observation_code;
+      } else if (failedStep?.sql_state) {
+        obsText = `SQLSTATE ${failedStep.sql_state}`;
+      } else {
+        obsText = translateRunSummary(run.summary, lang);
+      }
+    }
+
     return {
-      change: change
-        ? `${change.operation}${changeTarget ? ` ${changeTarget}` : ""}`
-        : t.summaryChangePending,
+      domain: isApi ? "API" : "DATABASE",
+      change: changeText,
       dependency:
         result.dependency_evidence.length > 0
           ? t.summaryDependencyFound
           : t.summaryDependencyPending,
-      observation: proof
-        ? "FAIL → PASS"
-        : run
-          ? failedStep?.sql_state
-            ? `SQLSTATE ${failedStep.sql_state}`
-            : translateRunSummary(run.summary, lang)
-          : t.summaryObservationPending,
+      observation: obsText,
+      observationLabel: isApi ? t.summaryObservationApiLabel : t.summaryObservationLabel,
       verdict: proof?.verdict ?? run?.verdict ?? t.summaryVerdictPending,
       verdictClass:
         proof?.verdict === "PROVEN_FIXED" || run?.verdict === "PROVEN_PASS"
@@ -313,10 +380,16 @@ export function AnalysisForm() {
     await analyze(repository, Number(pullRequest));
   }
 
-  async function runDemo() {
-    setRepository(demoRepository);
-    setPullRequest(demoPullRequest);
-    await analyze(demoRepository, Number(demoPullRequest));
+  async function runSelectedDemo(demoKind: "database" | "api" = selectedDemo) {
+    if (demoKind === "database") {
+      setRepository(dbDemoRepo);
+      setPullRequest(dbDemoPR);
+      await analyze(dbDemoRepo, Number(dbDemoPR));
+    } else {
+      setRepository(apiDemoRepo);
+      setPullRequest(apiDemoPR);
+      await analyze(apiDemoRepo, Number(apiDemoPR));
+    }
   }
 
   async function runExperiment(fixtureId: string, planId: string) {
@@ -379,18 +452,69 @@ export function AnalysisForm() {
   return (
     <>
       {demoConfigured && (
-        <section className="demo-launcher" aria-label={t.demoHint}>
-          <button
-            className="btn-live-demo"
-            disabled={loading}
-            onClick={runDemo}
-            type="button"
-          >
-            {loading ? t.analyzingBtn : t.loadDemoBtn} <span>→</span>
-          </button>
-          <div>
-            <strong>{t.demoHint}</strong>
-            <code>{t.demoScenario}</code>
+        <section className="demo-launcher" aria-label={selectedDemo === "database" ? t.demoHint : t.apiDemoHint}>
+          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.85rem", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className={`btn-demo-selector ${selectedDemo === "database" ? "active" : ""}`}
+              onClick={() => setSelectedDemo("database")}
+              style={{
+                padding: "0.45rem 0.9rem",
+                borderRadius: "6px",
+                border: selectedDemo === "database" ? "1px solid #06b6d4" : "1px solid #334155",
+                background: selectedDemo === "database" ? "rgba(6, 182, 212, 0.15)" : "#0f172a",
+                color: selectedDemo === "database" ? "#22d3ee" : "#94a3b8",
+                cursor: "pointer",
+                fontSize: "0.82rem",
+                fontWeight: 600,
+                textAlign: "left",
+              }}
+            >
+              [ {t.databaseDemoTabTitle} ]
+              <span style={{ display: "block", fontSize: "0.72rem", fontWeight: 400, opacity: 0.85 }}>
+                {t.databaseDemoTabDesc}
+              </span>
+            </button>
+            <button
+              type="button"
+              className={`btn-demo-selector ${selectedDemo === "api" ? "active" : ""}`}
+              onClick={() => setSelectedDemo("api")}
+              style={{
+                padding: "0.45rem 0.9rem",
+                borderRadius: "6px",
+                border: selectedDemo === "api" ? "1px solid #06b6d4" : "1px solid #334155",
+                background: selectedDemo === "api" ? "rgba(6, 182, 212, 0.15)" : "#0f172a",
+                color: selectedDemo === "api" ? "#22d3ee" : "#94a3b8",
+                cursor: "pointer",
+                fontSize: "0.82rem",
+                fontWeight: 600,
+                textAlign: "left",
+              }}
+            >
+              [ {t.apiDemoTabTitle} ]
+              <span style={{ display: "block", fontSize: "0.72rem", fontWeight: 400, opacity: 0.85 }}>
+                {t.apiDemoTabDesc}
+              </span>
+            </button>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+            <button
+              className="btn-live-demo"
+              disabled={loading}
+              onClick={() => runSelectedDemo(selectedDemo)}
+              type="button"
+            >
+              {loading ? t.analyzingBtn : t.loadDemoBtn} <span>→</span>
+            </button>
+            <div>
+              <strong>
+                {selectedDemo === "database" ? t.demoHint : t.apiDemoHint}
+              </strong>
+              <code>
+                {selectedDemo === "database" ? t.demoScenario : t.apiDemoScenario}
+              </code>
+            </div>
           </div>
         </section>
       )}
@@ -423,7 +547,7 @@ export function AnalysisForm() {
           />
         </div>
         <button disabled={loading} type="submit">
-          {loading ? t.analyzingBtn : t.analyzeBtn} <span>→</span>
+          {loading ? t.analyzingBtn : t.analyzeBtn}
         </button>
       </form>
 
@@ -442,9 +566,42 @@ export function AnalysisForm() {
         <section className="analysis-result" aria-label="Pull request analysis">
           {summary && (
             <section className="proof-summary" aria-label={t.proofSummaryEyebrow}>
-              <div className="proof-summary-heading">
-                <p className="eyebrow">{t.proofSummaryEyebrow}</p>
-                <h2>{t.proofSummaryHeading}</h2>
+              <div
+                className="proof-summary-heading"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "0.5rem",
+                }}
+              >
+                <div>
+                  <p className="eyebrow">{t.proofSummaryEyebrow}</p>
+                  <h2>{t.proofSummaryHeading}</h2>
+                </div>
+                <span
+                  className="badge"
+                  style={{
+                    fontSize: "0.75rem",
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                    padding: "0.25rem 0.6rem",
+                    background:
+                      summary.domain === "API"
+                        ? "rgba(168, 85, 247, 0.15)"
+                        : "rgba(6, 182, 212, 0.15)",
+                    color: summary.domain === "API" ? "#c084fc" : "#22d3ee",
+                    border:
+                      summary.domain === "API"
+                        ? "1px solid rgba(168, 85, 247, 0.4)"
+                        : "1px solid rgba(6, 182, 212, 0.4)",
+                    borderRadius: "4px",
+                    fontWeight: 700,
+                  }}
+                >
+                  {summary.domain === "API" ? t.domainApi : t.domainDatabase}
+                </span>
               </div>
               <ol className="proof-chain">
                 <li className="proof-node fact-node">
@@ -458,7 +615,7 @@ export function AnalysisForm() {
                 </li>
                 <li className="proof-arrow" aria-hidden="true">→</li>
                 <li className={`proof-node observation-node ${summary.verdictClass}`}>
-                  <small>{t.summaryObservationLabel}</small>
+                  <small>{summary.observationLabel}</small>
                   <strong>{summary.observation}</strong>
                 </li>
                 <li className="proof-arrow" aria-hidden="true">→</li>
