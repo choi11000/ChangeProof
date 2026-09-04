@@ -100,7 +100,15 @@ def extract_dependency_targets(
     targets_map: dict[tuple[DependencyTargetType, str, str | None], list[str]] = {}
 
     for fact in change_facts:
+        if fact.domain == "API" and fact.api_change:
+            ch = fact.api_change
+            key = (DependencyTargetType.API_FIELD, ch.path, ch.field_name)
+            targets_map.setdefault(key, []).append(fact.id)
+            continue
+
         change = fact.change
+        if not change:
+            continue
         if change.operation in COLUMN_OPERATIONS and change.table and change.column:
             key = (DependencyTargetType.COLUMN, change.table, change.column)
             targets_map.setdefault(key, []).append(fact.id)
@@ -109,15 +117,26 @@ def extract_dependency_targets(
             targets_map.setdefault(key, []).append(fact.id)
 
     targets: list[DependencyTarget] = []
-    for (target_type, table, column), cids in targets_map.items():
-        targets.append(
-            DependencyTarget(
-                type=target_type,
-                table=table,
-                column=column,
-                change_ids=cids,
+    for (target_type, entity_or_path, col_or_field), cids in targets_map.items():
+        if target_type == DependencyTargetType.API_FIELD:
+            targets.append(
+                DependencyTarget(
+                    type=target_type,
+                    table="",
+                    path=entity_or_path,
+                    field=col_or_field,
+                    change_ids=cids,
+                )
             )
-        )
+        else:
+            targets.append(
+                DependencyTarget(
+                    type=target_type,
+                    table=entity_or_path,
+                    column=col_or_field,
+                    change_ids=cids,
+                )
+            )
     return targets
 
 

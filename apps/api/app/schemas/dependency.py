@@ -2,26 +2,33 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+from app.schemas.api_contract import ApiChange
 from app.schemas.sql_change import SqlChange
 
 
 class DependencyTargetType(StrEnum):
     TABLE = "TABLE"
     COLUMN = "COLUMN"
+    API_ENDPOINT = "API_ENDPOINT"
+    API_FIELD = "API_FIELD"
 
 
 class ChangeFact(BaseModel):
     id: str
-    sql_file_path: str
+    domain: str = "DATABASE"
+    sql_file_path: str = ""
     content_sha: str | None = None
-    statement_index: int = Field(ge=0)
-    change: SqlChange
+    statement_index: int = Field(default=0, ge=0)
+    change: SqlChange | None = None
+    api_change: ApiChange | None = None
 
 
 class DependencyTarget(BaseModel):
     type: DependencyTargetType
-    table: str
+    table: str = ""
     column: str | None = None
+    path: str | None = None
+    field: str | None = None
     change_ids: list[str] = Field(default_factory=list)
 
 
@@ -35,6 +42,7 @@ class DependencyMatchKind(StrEnum):
     TABLE_AND_COLUMN_CONTEXT = "TABLE_AND_COLUMN_CONTEXT"
     COLUMN_IDENTIFIER = "COLUMN_IDENTIFIER"
     TABLE_IDENTIFIER = "TABLE_IDENTIFIER"
+    DIRECT_RESPONSE_FIELD_REFERENCE = "DIRECT_RESPONSE_FIELD_REFERENCE"
 
 
 class DependencyEvidence(BaseModel):
