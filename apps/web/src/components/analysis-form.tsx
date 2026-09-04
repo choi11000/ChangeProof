@@ -357,7 +357,6 @@ export function AnalysisForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fixture_id: fixtureId,
-          experiment_plan_id: planId,
         }),
       });
       const body = await response.json();

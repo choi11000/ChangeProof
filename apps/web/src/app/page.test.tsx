@@ -390,6 +390,16 @@ describe("Home", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /복구 검증/i }));
     await waitFor(() => expect(screen.getByText("PROVEN FIXED")).toBeInTheDocument());
+    expect(fetchSpy.mock.calls[2]?.[0]).toBe(
+      "http://localhost:8000/api/v1/proofs/remediation",
+    );
+    const remediationRequest = JSON.parse(
+      fetchSpy.mock.calls[2]?.[1]?.body as string,
+    ) as Record<string, unknown>;
+    expect(remediationRequest).toEqual({
+      fixture_id: "risky-saas/drop-legacy-status",
+    });
+    expect(remediationRequest).not.toHaveProperty("experiment_plan_id");
     expect(screen.getByText("PROVEN_FIXED")).toBeInTheDocument();
     expect(screen.getByText("FAIL → PASS")).toBeInTheDocument();
     expect(screen.getByText(/동일 실험: 예/i)).toBeInTheDocument();
