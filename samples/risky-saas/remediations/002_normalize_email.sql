@@ -1,0 +1,2 @@
+UPDATE users SET email = LEFT(email, 30) WHERE LENGTH(email) > 30;
+ALTER TABLE users ALTER COLUMN email TYPE VARCHAR(30);

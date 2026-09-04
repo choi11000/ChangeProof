@@ -5,18 +5,130 @@
 ChangeProof never converts an LLM opinion directly into a verdict. Facts come from deterministic tools and every confirmed risk points to evidence.
 
 ```text
-Change -> Understand -> Dependencies -> Risk hypothesis
-       -> Validation plan -> Tool execution -> Evidence
-       -> Deterministic score -> Remediation -> Re-validation
+1. Change Intake             GitHub pull request                    COMPLETE
+2. Change Understanding      File classification + SQL parsing     COMPLETE
+3. Dependency Discovery      Application <-> schema                COMPLETE
+4. Failure Hypothesis        Evidence-grounded AI reasoning        COMPLETE
+5. Experiment Planning       Deterministic ExperimentCompiler      COMPLETE
+6. Execution                 Ephemeral PostgreSQL                  COMPLETE
+7. Evidence                  Observed SQLSTATE results             COMPLETE
+8. Remediation               Deterministic schema fix              COMPLETE
+9. Re-execution              Same experiment                       COMPLETE
+10. Proof                    Server-authoritative invariants       COMPLETE
+```
+
+The runtime status is backed by GitHub Actions run `33747973539`: PostgreSQL 17.6 executed all 11 sandbox tests without skips, including four exact SQLSTATE failures, one safe additive pass, cleanup inspection, concurrency isolation, and all four remediation pairs.
+
+The product promise is not merely to predict failure:
+> Don't predict the failure. Reproduce it before production.
+
+## Architecture Overview: Dual Proof Verticals
+
+ChangeProof supports two proof verticals powered by a common deterministic proof engine:
+
+```text
+                    GitHub PR
+                        │
+                Change Analysis
+                        │
+                ┌───────┴───────┐
+                │               │
+             DATABASE          API
+                │               │
+           ChangeFact       ChangeFact
+                │               │
+              Evidence        Evidence
+                └───────┬───────┘
+                        │
+                     OpenAI
+                   HYPOTHESIS
+                        │
+                Experiment Compiler
+                        │
+                ┌───────┴───────┐
+                │               │
+          PostgreSQL        API Runtime
+          Observation       Observation
+                │               │
+                └───────┬───────┘
+                        │
+               Deterministic Verifier
+                        │
+                      PROOF
 ```
 
 ## Runtime components
 
-- `apps/web`: Next.js App Router interface for PR input and analysis results.
-- `apps/api`: FastAPI HTTP boundary and future explicit analysis state machine.
-- `postgres`: persistent product data such as analyses, steps, and evidence.
-- `sandbox-postgres`: opt-in disposable target for migration validation.
-- `samples/risky-saas`: synthetic demonstration repository (Phase 2).
+- `apps/web`: Next.js App Router interface for PR input, change facts, dependency evidence, failure hypotheses, experiment plans, and observed execution results for both Database Schema and API Contract domains.
+- `apps/api`: FastAPI HTTP boundary, PR analysis pipeline, and experiment execution router.
+- `clients/github.py`: timeout-bounded GitHub REST access for PRs, files, and repository trees.
+- `clients/openai_client.py`: timeout-bounded OpenAI client using Responses API with Structured Outputs.
+- `services/pull_request_service.py`: change-intake, dependency discovery, and planning orchestration across SQL and OpenAPI documents.
+- `services/controlled_demo_policy.py`: exact server-side demo identity authorization (exact repository, PR number, and audited head SHA for both Database and API demo repositories; no substring matching).
+- `services/repository_source_service.py`: bounded source snapshot collection at PR head SHA.
+- `services/failure_planning_service.py`: safe failure planning orchestration and domain validation.
+- `services/planning_context_budget.py`: deterministic change/evidence/warning selection with transparent truncation statistics.
+- `services/ai_planning_cache.py`: bounded TTL planning cache and same-fingerprint async single-flight.
+- `services/experiment_execution_service.py`: controlled fixture validation, executor invocation (Postgres or API), and deterministic verdict synthesis.
+- `analyzers/file_classifier.py`: deterministic path-based classification and content policy (SQL migrations and OpenAPI 3.x specifications).
+- `analyzers/openapi_parser.py`: deterministic OpenAPI 3.x parsing, local `$ref` resolution, cyclic protection, remote `$ref` rejection, and `REMOVE_RESPONSE_FIELD` ChangeFact generation.
+- `analyzers/api_dependency.py`: deterministic consumer dependency discovery for direct API response field references.
+- `analyzers/dependency.py`: deterministic target extraction, reference matching, and impact summary.
+- `analyzers/experiment_compiler.py`: deterministic compiler generating executable, read-oriented experiment plans.
+- `analyzers/experiment_verifier.py`: deterministic verifier attributing observations (`SQLSTATE 42703` or `API_MISSING_RESPONSE_FIELD`) to `PROVEN_FAIL` / `PROVEN_PASS` / `INCONCLUSIVE` / `EXECUTION_ERROR`.
+- `schemas/experiment_identity.py`: canonical, server-owned SHA-256 identities separating the stable experiment contract from the executed subject.
+- `executors/postgres_experiment.py`: ephemeral schema isolation (`cp_run_<hex12>`), statement/lock timeouts, and secret-redacted execution runner.
+- `executors/api_experiment.py`: in-process Starlette ASGI fixture execution with real HTTP request/response and deterministic consumer probe without network egress.
+- `fixtures/api_fixtures.py`: server-controlled registry of synthetic API contract fixtures (`api-contract/remove-user-email`).
+- `fixtures/experiment_registry.py`: server-controlled registry of synthetic demo fixtures.
+- `choi11000/changeproof-demo`: public synthetic demonstration repository with audited demo PR #1.
+- `samples/risky-saas`: local synthetic demonstration repository mirroring the demo schema.
+- `sandbox-postgres`: disposable target for isolated experiment execution.
+
+Execution requests cannot provide proof digests. The server hashes sorted, compact UTF-8 JSON over baseline schema, seed data, target, template, verification SQL, and verifier contract version for `experiment_contract_digest`; migration content and candidate variant form `subject_digest`. Verdict attribution requires exact SQLSTATE equality, while database cleanup status is recorded separately from the hypothesis verdict.
+
+## Deterministic remediation and same-experiment proof
+
+`ControlledRemediation` pairs each failing demo fixture with one audited SQL migration. The registry contains compatibility preservation for the dropped column and table cases, synthetic backfill before `NOT NULL`, and explicit synthetic data normalization before type narrowing. Safe additive changes have no remediation.
+
+`POST /api/v1/proofs/remediation` accepts only a controlled fixture ID. The server reruns the original fixture, selects the paired remediation, reruns it against the same baseline, seed, target, template, verification SQL, and verifier version, and compares server-owned identities. `PROVEN_FIXED` requires original `PROVEN_FAIL`, remediated `PROVEN_PASS`, identical contract digests, different subject digests, and no execution error. A fail-after-fail pair is `NOT_FIXED`; mismatched identity or incomplete evidence is `INCONCLUSIVE`.
+
+AI remains limited to hypothesis reasoning. It does not generate remediation SQL, execute commands, or assign either experiment or proof verdicts. A proof applies only to its controlled experiment, not to the pull request or production system.
+
+## Public-service runtime guards
+
+Repository verification returns typed visibility metadata, and the default/production boundary rejects private repositories before PR content is fetched. AI context is bounded and deterministically prioritized by source scope, match strength, unchanged-reference value, and target coverage. A planning fingerprint includes the PR head SHA, bounded context, model, and prompt version. Only domain-valid structured results enter the bounded TTL cache; simultaneous identical requests share one upstream call. Responses expose token counts when the OpenAI API supplies them, never a hard-coded dollar estimate.
+
+The three expensive POST routes have independent fixed-window per-client limits. Client identity comes from the socket peer unless a trusted-proxy mode is explicitly enabled. Experiments and an entire before/after remediation proof each acquire one non-blocking sandbox slot, so a proof cannot deadlock by reacquiring its own slot. Stores and concurrency are bounded, but process-local; horizontal deployments require a shared limiter/cache design in a later phase.
+
+Every response receives a server-generated request ID. Unexpected errors retain a secret-redacted traceback in server logs and return only a generic correlation reference. CORS origins and API documentation exposure are configuration-driven, and production settings fail validation when the public-repository policy, sandbox URL, or explicit CORS origin is missing.
+
+## SQL change analysis
+
+`SqlMigrationParser` parses PostgreSQL DDL with sqlglot and converts supported statements into Pydantic contracts. Each record identifies the source statement, operation, affected table or column, type/default/nullability/reference metadata, and whether the operation is destructive. Unsupported non-DDL statements produce no fabricated changes; invalid SQL returns a domain-specific parse error.
+
+## GitHub pull request intake
+
+`POST /api/v1/analyses/github-pr` normalizes a GitHub repository reference, verifies the repository, fetches typed PR metadata and changed files, and classifies every path. SQL migrations are fetched as complete content from the head SHA rather than parsed from a diff. Removed migrations are fetched from the base SHA for identity but are deliberately not treated as new executable SQL. One unavailable or invalid SQL file becomes a structured warning instead of failing the entire analysis.
+
+## Cross-layer dependency discovery
+
+`DependencyAnalyzer` and `RepositorySourceService` bridge schema changes and application source code. The pipeline extracts dependency targets from destructive and schema-altering SQL changes (`DROP_COLUMN`, `ALTER_COLUMN_TYPE`, nullability/default modifications, and `DROP_TABLE`).
+
+Instead of inspecting only PR changed files, ChangeProof fetches the complete repository tree snapshot at the PR `head_sha`. Candidate source files are filtered through strict content policies (excluding secrets, keys, lockfiles, and binaries) and bounded by configurable safety limits (300 files, 256 KiB per file, 5 MiB total content).
+
+References are matched using deterministic identifier boundaries and categorized into `QUALIFIED_REFERENCE` (direct property, index, or dot access), `TABLE_AND_COLUMN_CONTEXT` (vicinity co-occurrence), and `COLUMN_IDENTIFIER` / `TABLE_IDENTIFIER` (bare symbol reference). Every match produces a `DependencyEvidence` record with path, line number, match kind, secret-redacted excerpt, and whether the referencing file was changed in the PR or existed previously in the repository.
+
+This phase provides deterministic source-reference evidence, not compiler-level semantic dependency proof.
+
+## Failure hypothesis & executable experiment planning
+
+Phase 5 introduces AI reasoning strictly bounded by deterministic facts:
+1. **AI Hypothesis Generator**: An LLM reads only minimal structured context (change facts, evidence summaries, scan completeness, and warnings). It proposes testable `FailureHypothesis` records (`status=UNVERIFIED`) and selects an allowlisted `ExperimentTemplate`. The prompt boundary enforces that repository excerpts are untrusted data; the AI cannot invent IDs or generate arbitrary commands.
+2. **Domain Validation**: The service validates that referenced change IDs and evidence IDs strictly belong to the provided set, and ensures the template is allowlisted.
+3. **Deterministic Experiment Compiler**: `ExperimentCompiler` generates executable `ExperimentPlan` records (`status=NOT_EXECUTED`) using allowlisted, safe, read-only SQL patterns without shell command execution.
+
+The intake records the completed steps `FETCH_PR_METADATA`, `FETCH_CHANGED_FILES`, `CLASSIFY_FILES`, `FETCH_SQL_CONTENT`, `ANALYZE_SQL`, `BUILD_CHANGE_FACTS`, `EXTRACT_DEPENDENCY_TARGETS`, `FETCH_REPOSITORY_TREE`, `FETCH_APPLICATION_CONTENT`, `DISCOVER_DEPENDENCIES`, `SUMMARIZE_IMPACT`, `GENERATE_FAILURE_HYPOTHESES`, `VALIDATE_HYPOTHESES`, and `COMPILE_EXPERIMENT_PLANS`. Logs contain only repository/PR identifiers and aggregate facts.
 
 ## Planned analysis state
 
@@ -25,6 +137,7 @@ Each pipeline stage accepts and returns typed state. The state will contain repo
 ## Trust boundaries
 
 - Secrets and credential-like content are redacted before any AI request.
+- Secret-bearing files and binary/lockfile content are excluded; credential-like patch and SQL fields are redacted before they can leave the intake boundary.
 - GitHub, AI, Docker, and database errors produce explicit failed-step results.
 - LLM output may propose hypotheses and explanations but cannot invent tool results, evidence, or scores.
 - Sandbox validation uses disposable infrastructure separated from product data.

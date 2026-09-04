@@ -15,3 +15,4 @@ dist/
 *.log
 .idea/
 .vscode/
+.railway/
