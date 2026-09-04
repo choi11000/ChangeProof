@@ -6,6 +6,7 @@ from pathlib import Path
 
 from app.analyzers.experiment_verifier import ExperimentVerifier
 from app.executors.api_experiment import ApiExperimentExecutor
+from app.executors.performance_experiment import PerformanceExperimentExecutor
 from app.executors.postgres_experiment import (
     FixtureExecutionResult,
     PostgresExperimentExecutor,
@@ -15,6 +16,10 @@ from app.fixtures.experiment_registry import (
     ControlledExperimentFixture,
     get_controlled_fixture,
     get_repo_root,
+)
+from app.fixtures.shiftsafe_fixtures import (
+    ControlledPerformanceFixture,
+    get_controlled_performance_fixture,
 )
 from app.schemas.execution import (
     ExecuteExperimentRequest,
@@ -42,15 +47,26 @@ class ExperimentExecutionService:
         executor: PostgresExperimentExecutor | None = None,
         verifier: ExperimentVerifier | None = None,
         api_executor: ApiExperimentExecutor | None = None,
+        perf_executor: PerformanceExperimentExecutor | None = None,
         *,
         repo_root: Path | None = None,
     ) -> None:
         self.executor = executor
         self.api_executor = api_executor or ApiExperimentExecutor()
+        self.perf_executor = perf_executor or PerformanceExperimentExecutor()
         self.verifier = verifier or ExperimentVerifier()
         self.repo_root = repo_root or get_repo_root()
 
     def execute(self, request: ExecuteExperimentRequest) -> ExperimentRun:
+        # Check Performance / ShiftSafe fixtures first
+        perf_fixture = get_controlled_performance_fixture(request.fixture_id)
+        if perf_fixture is not None:
+            return self.execute_controlled_performance_fixture(
+                perf_fixture,
+                experiment_plan_id=request.experiment_plan_id,
+                variant="candidate",
+            )
+
         api_fixture = get_controlled_api_fixture(request.fixture_id)
         if api_fixture is not None:
             return self.execute_controlled_api_fixture(
@@ -70,6 +86,43 @@ class ExperimentExecutionService:
             fixture,
             experiment_plan_id=request.experiment_plan_id,
             subject_variant="original",
+        )
+
+    def execute_controlled_performance_fixture(
+        self,
+        fixture: ControlledPerformanceFixture,
+        *,
+        experiment_plan_id: str | None = None,
+        variant: str = "candidate",
+    ) -> ExperimentRun:
+        started_at = datetime.now(UTC)
+        step_results = self.perf_executor.execute_fixture(fixture, variant=variant)
+        finished_at = datetime.now(UTC)
+
+        verdict, summary = self.verifier.evaluate(fixture.template, step_results)
+        plan_id = experiment_plan_id or f"plan_{fixture.id.replace('/', '_')}"
+
+        # Extract aggregate metrics from the load step
+        perf_metrics = None
+        for step in step_results:
+            if step.performance_metrics:
+                perf_metrics = step.performance_metrics
+                break
+
+        return ExperimentRun(
+            id=f"run_perf_{uuid.uuid4().hex[:12]}",
+            experiment_plan_id=plan_id,
+            experiment_contract_digest=fixture.compute_contract_digest(),
+            subject_digest=fixture.compute_subject_digest(variant=variant),
+            template=fixture.template,
+            domain="PERFORMANCE",
+            verdict=verdict,
+            started_at=started_at,
+            finished_at=finished_at,
+            step_results=step_results,
+            performance_metrics=perf_metrics,
+            cleanup_succeeded=True,
+            summary=summary,
         )
 
     def execute_controlled_api_fixture(

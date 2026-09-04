@@ -4,11 +4,13 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.experiment import ExperimentStepType, ExperimentTemplate
+from app.schemas.performance import PerformanceMetrics
 
 
 class ExperimentVerdict(StrEnum):
     PROVEN_FAIL = "PROVEN_FAIL"
     PROVEN_PASS = "PROVEN_PASS"
+    PROVEN_BOTTLENECK = "PROVEN_BOTTLENECK"
     INCONCLUSIVE = "INCONCLUSIVE"
     EXECUTION_ERROR = "EXECUTION_ERROR"
 
@@ -34,6 +36,7 @@ class ExperimentStepResult(BaseModel):
     message: str | None = None
     scalar_value: int | str | bool | None = None
     row_count: int | None = None
+    performance_metrics: PerformanceMetrics | None = None
 
 
 class ExperimentRun(BaseModel):
@@ -47,6 +50,7 @@ class ExperimentRun(BaseModel):
     started_at: datetime
     finished_at: datetime
     step_results: list[ExperimentStepResult] = Field(default_factory=list)
+    performance_metrics: PerformanceMetrics | None = None
     cleanup_succeeded: bool | None = None
     summary: str
 
