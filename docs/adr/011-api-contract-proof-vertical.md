@@ -22,7 +22,7 @@ Proving engine reusability requires implementing a second proof domain with real
    To prevent remote code execution (RCE) and supply-chain vulnerabilities, ChangeProof **never** executes untrusted repository code. It never executes `npm install`, `pip install`, arbitrary shell commands, postinstall scripts, or GitHub Actions.
 
 4. **Server-Owned Controlled ASGI Runtime**:
-   The API contract experiment executes in-process using Starlette and an ASGI transport (`starlette.testclient.TestClient`). The server maintains controlled fixtures (`api-contract/remove-user-email`) with verified baseline, changed, and remediated responses. The test executes a real HTTP request (`GET /users/1`) and runs a deterministic consumer probe against the actual HTTP response payload with zero external network egress.
+   The API contract experiment executes using a server-owned in-process ASGI runtime (`starlette.testclient.TestClient`) with no external network egress. The server maintains controlled fixtures (`api-contract/remove-user-email`) with verified baseline, changed, and remediated responses. The test executes a real HTTP request (`GET /users/1`) and runs a deterministic consumer probe against the actual HTTP response payload with zero external network egress.
 
 5. **Deterministic Observation Codes**:
    The API domain does not reuse or overload SQLSTATE. Instead, it introduces deterministic API observation codes (e.g., `API_MISSING_RESPONSE_FIELD`). Verdicts require exact observation code equality; string matching or heuristic guesswork is strictly forbidden.
