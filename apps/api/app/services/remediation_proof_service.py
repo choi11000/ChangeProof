@@ -3,6 +3,7 @@ import uuid
 from app.fixtures.api_fixtures import get_controlled_api_fixture
 from app.fixtures.experiment_registry import get_controlled_fixture
 from app.fixtures.remediation_registry import get_controlled_remediation
+from app.fixtures.shiftsafe_fixtures import get_controlled_performance_fixture
 from app.schemas.execution import ExecuteExperimentRequest, ExperimentRun, ExperimentVerdict
 from app.schemas.remediation import (
     RemediationProof,
@@ -33,13 +34,13 @@ def evaluate_proof_pair(
     if not same_experiment or not subject_changed:
         return RemediationProofVerdict.INCONCLUSIVE, same_experiment, subject_changed
     if (
-        before.verdict is ExperimentVerdict.PROVEN_FAIL
+        before.verdict in (ExperimentVerdict.PROVEN_FAIL, ExperimentVerdict.PROVEN_BOTTLENECK)
         and after.verdict is ExperimentVerdict.PROVEN_PASS
     ):
         return RemediationProofVerdict.PROVEN_FIXED, same_experiment, subject_changed
     if (
-        before.verdict is ExperimentVerdict.PROVEN_FAIL
-        and after.verdict is ExperimentVerdict.PROVEN_FAIL
+        before.verdict in (ExperimentVerdict.PROVEN_FAIL, ExperimentVerdict.PROVEN_BOTTLENECK)
+        and after.verdict in (ExperimentVerdict.PROVEN_FAIL, ExperimentVerdict.PROVEN_BOTTLENECK)
     ):
         return RemediationProofVerdict.NOT_FIXED, same_experiment, subject_changed
     return RemediationProofVerdict.INCONCLUSIVE, same_experiment, subject_changed
@@ -50,7 +51,33 @@ class RemediationProofService:
         self.execution_service = execution_service
 
     def prove(self, request: RemediationProofRequest) -> RemediationProof:
-        # Check API fixtures first
+        # Check Performance fixtures first
+        perf_fixture = get_controlled_performance_fixture(request.fixture_id)
+        if perf_fixture is not None:
+            before = self.execution_service.execute_controlled_performance_fixture(
+                perf_fixture, variant="candidate"
+            )
+            after = self.execution_service.execute_controlled_performance_fixture(
+                perf_fixture, variant="remediated"
+            )
+            verdict, same_experiment, subject_changed = evaluate_proof_pair(before, after)
+            return RemediationProof(
+                id=f"proof_perf_{uuid.uuid4().hex[:12]}",
+                fixture_id=perf_fixture.id,
+                remediation_id=f"remediation/{perf_fixture.id}",
+                domain="PERFORMANCE",
+                strategy=perf_fixture.remediation_strategy,
+                description=perf_fixture.remediation_description,
+                experiment_contract_digest=before.experiment_contract_digest,
+                before=before,
+                after=after,
+                verdict=verdict,
+                same_experiment=same_experiment,
+                subject_changed=subject_changed,
+                summary=self._summary(verdict),
+            )
+
+        # Check API fixtures
         api_fixture = get_controlled_api_fixture(request.fixture_id)
         if api_fixture is not None:
             before = self.execution_service.execute_controlled_api_fixture(

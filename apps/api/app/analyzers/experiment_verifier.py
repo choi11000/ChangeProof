@@ -36,9 +36,15 @@ API_REQUIRED_STEPS = {
     ExperimentStepType.CAPTURE_API_RESULT,
 }
 
+PERF_REQUIRED_STEPS = {
+    ExperimentStepType.INITIALIZE_LOAD_ENVIRONMENT,
+    ExperimentStepType.RUN_CONCURRENT_LOAD,
+    ExperimentStepType.CAPTURE_PERFORMANCE_METRICS,
+}
+
 
 class ExperimentVerifier:
-    """Attribute verdicts only to complete, typed PostgreSQL or API observations."""
+    """Attribute verdicts only to complete, typed PostgreSQL, API, or Performance observations."""
 
     def evaluate(
         self,
@@ -48,6 +54,37 @@ class ExperimentVerifier:
         expected_sqlstate: str | None = None,
     ) -> tuple[ExperimentVerdict, str]:
         step_map = {step.type: step for step in step_results}
+
+        # Handle Performance load experiments
+        if template is ExperimentTemplate.EXTERNAL_DEPENDENCY_LATENCY:
+            missing_perf = PERF_REQUIRED_STEPS.difference(step_map)
+            if missing_perf:
+                labels = ", ".join(sorted(step.value for step in missing_perf))
+                return (
+                    ExperimentVerdict.INCONCLUSIVE,
+                    f"Performance experiment outcome inconclusive: Missing required steps: {labels}.",
+                )
+            capture = step_map[ExperimentStepType.CAPTURE_PERFORMANCE_METRICS]
+            if capture.observation_code == "DOWNSTREAM_QUEUE_AMPLIFICATION":
+                return (
+                    ExperimentVerdict.PROVEN_FAIL,
+                    (
+                        "Peak bottleneck reproduced in controlled load test: "
+                        "Downstream queue amplification detected (p95 latency degraded under peak concurrency)."
+                    ),
+                )
+            if all(step_map[s].status is ExperimentStepStatus.PASSED for s in PERF_REQUIRED_STEPS):
+                return (
+                    ExperimentVerdict.PROVEN_PASS,
+                    (
+                        "Peak load experiment passed: Healthy throughput and latency maintained "
+                        "under concurrent load."
+                    ),
+                )
+            return (
+                ExperimentVerdict.INCONCLUSIVE,
+                "Performance experiment outcome inconclusive: Required steps did not succeed.",
+            )
 
         # Handle API contract experiments
         if template is ExperimentTemplate.API_RESPONSE_FIELD_COMPATIBILITY:
