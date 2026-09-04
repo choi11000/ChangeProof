@@ -1,205 +1,121 @@
 # ChangeProof
 
-**사용자가 몰리기 전에, 병목을 먼저 재현하세요.**  
-*(Reproduce the bottleneck before peak traffic does.)*
+**사용자가 몰리기 전에, 병목을 먼저 재현하세요.**
 
-ChangeProof analyzes software changes, identifies new peak-load risks, generates targeted load experiments with AI, and executes them in a controlled development environment before deployment.
+ChangeProof는 코드 변경을 분석해 이번 릴리스에서 새로 검증해야 할 부하 위험을 AI가 제안하고, 개발 환경에서 실제 동시 요청을 실행해 운영 피크 시간에 나타날 수 있는 병목을 배포 전에 재현하는 AI 테스트 에이전트입니다.
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Peak%20Load%20Proof-blue?style=for-the-badge&logo=railway)](https://changeproof-web-production.up.railway.app)
 [![CI Status](https://img.shields.io/badge/CI-Passing-brightgreen?style=for-the-badge&logo=githubactions)](https://github.com/choi11000/ChangeProof/actions)
-[![Test Coverage](https://img.shields.io/badge/Coverage-93.89%25-brightgreen?style=for-the-badge)](apps/api)
+[![Coverage](https://img.shields.io/badge/Coverage-93.69%25-brightgreen?style=for-the-badge)](apps/api)
 
----
-
-## 🎯 The Real Problem: The Peak-Load Blindspot
+## 기능 테스트가 통과해도 운영에서는 실패할 수 있습니다
 
 ```text
-Code / infrastructure change
-   ↓
-Functional test PASS (1 user, 15ms)
-   ↓
-Development environment appears completely healthy
-   ↓
-Production peak time arrives
-   ↓
-150 concurrent users hit the endpoint simultaneously
-   ↓
-New downstream dependency or lock contention amplifies latency
-   ↓
-Requests accumulate behind limited connection capacity
-   ↓
-Service experiences severe latency explosion (p95: 4.8s) or cascading timeouts
+Functional Test
+PASS
+
+↓
+
+Peak Load
+BOTTLENECK REPRODUCED
+
+↓
+
+Fix
+
+↓
+
+Same Load
+RECOVERY VERIFIED
 ```
 
-### The Typical Scenario
-Before change:
-```text
-GET /dashboard → database lookup (15ms) → response
-```
+실제 서비스에서는 출근 시간, 이벤트 오픈, 예약 시작처럼 사용자가 한꺼번에 몰리는 순간 외부 API 응답 지연이나 제한된 connection capacity가 전체 서비스 지연으로 확대될 수 있습니다. 기존 부하 테스트 도구는 부하를 실행하지만, 이번 코드 변경 때문에 어떤 상황을 새로 검증해야 하는지는 개발자가 직접 판단해야 합니다.
 
-After risky change:
-```text
-GET /dashboard → database lookup → WeatherClient.get_current() (700ms external) → response
-```
+ChangeProof는 그 판단부터 실제 검증까지 연결합니다.
 
-* **Functional test**: **PASS** (15ms mock or single request succeeds normally).
-* **At 5 concurrent users**: Everything looks fine.
-* **At peak traffic (150 concurrent users)**: Outbound connection capacity (10) saturates, requests queue, p95 explodes from **180ms to 4,820ms**, and timeouts reach 18%.
+## Live Demo
 
----
+[프로덕션 데모 실행하기](https://changeproof-web-production.up.railway.app)
 
-## 💡 What ChangeProof Does: Change-Aware Load Verification
+데모는 `GET /dashboard` 요청 경로에 새 외부 API 호출이 추가된 변경을 다룹니다.
 
-ChangeProof is an **AI Test Agent** that reads **WHAT CHANGED** and compiles **WHAT NEW LOAD EXPERIMENT** should be executed because of that specific change.
+1. 단일 기능 요청은 `HTTP 200 PASS`입니다.
+2. 결정론적 분석이 `EXTERNAL_CALL_ADDED_TO_REQUEST_PATH` 변경 팩트를 추출합니다.
+3. OpenAI가 `DOWNSTREAM_QUEUE_AMPLIFICATION` 가설과 시나리오 유형을 `PROPOSED / UNVERIFIED` 상태로 제안합니다.
+4. 서버 소유의 통제된 fixture에서 동시 요청 150개, 총 300개 요청을 실제 실행합니다.
+5. 대표 production 캡처에서는 candidate p95 `3001ms`, downstream queue wait `1401ms`가 관측되어 `PROVEN_BOTTLENECK`이 발행됐습니다.
+6. 캐시와 중복 요청 병합을 적용한 subject에 같은 부하를 재실행합니다.
+7. 같은 캡처에서 recovered p95 `1ms`, downstream queue wait `0ms`가 관측되어 `PROVEN_RECOVERED`가 발행됐습니다.
 
-```text
-Code Change
-   ↓
-Deterministic Risk Facts (FastAPI route + external client call added to hot path)
-   ↓
-AI Risk Scenario Planner (OpenAI hypothesis: PROPOSED / UNVERIFIED)
-   ↓
-Deterministic Load Compiler (Bounded concurrency, safety caps)
-   ↓
-ChangeProof Runner (Async concurrent load generator)
-   ↓
-Runtime Observations (DOWNSTREAM_QUEUE_AMPLIFICATION, p95 4,820ms, timeouts 18%)
-   ↓
-Deterministic Bottleneck Verdict (PROVEN_BOTTLENECK)
-   ↓
-Remediation Applied (10s TTL Cache + Request Coalescing + 1.5s Timeout)
-   ↓
-SAME Load Experiment Executed (Identical contract digest, 150 concurrent users)
-   ↓
-Deterministic Recovery Verdict (PROVEN_RECOVERED, p95 310ms, timeouts 0%)
-```
+절대 처리량 수치는 server-owned in-process controlled runtime의 측정값이며 실제 production capacity를 뜻하지 않습니다. 제품의 주된 판단 근거는 p95 latency, downstream queue wait, 기능 테스트와 피크 부하의 대비, 동일 부하에서의 회복입니다.
 
----
+> 이 결과는 해당 통제 부하 실험에서 확인된 병목과 복구에 적용되며, 실제 운영 환경 전체의 성능을 보장하지 않습니다.
 
-## ⚡ Live Demo (ShiftSafe Workforce Safety Service)
+## AI가 하는 일과 하지 않는 일
 
-Experience the 10-second instant visual contrast in the web application:
-
-1. **Service**: Synthetic workforce safety dashboard (`GET /dashboard`).
-2. **Functional Test**: `PASS (200 OK, 15ms)`.
-3. **Risky Change**: Synchronous external `WeatherClient.get_current()` call added directly to the dashboard request path.
-4. **Click "피크 트래픽 재현 실행"** (Run Peak Load):
-   * 150 concurrent users, 300 requests, controlled 700ms downstream delay, capacity 10.
-   * **Result**: p95 spikes to **4,820 ms**, 18% timeouts $\rightarrow$ **`PROVEN_BOTTLENECK`** (`DOWNSTREAM_QUEUE_AMPLIFICATION`).
-5. **Click "수정 적용 및 동일 부하 재실행"** (Verify Recovery under Same Load):
-   * Applies cache + coalescing + 1.5s timeout.
-   * Re-executes the **exact same 150-user load scenario**.
-   * **Result**: p95 drops to **310 ms**, 0% timeouts $\rightarrow$ **`PROVEN_RECOVERED`** (`CONTRACT SAME: YES`, `CHANGED SUBJECT: YES`).
-
----
-
-## 🖥️ Local Runner Agent (`apps/runner`)
-
-In enterprise environments with private repositories, DLP, DRM, or internal staging services unreachable from public SaaS, ChangeProof runs directly inside developer networks:
-
-```bash
-# 1. Install local runner
-pip install -e apps/runner
-
-# 2. Inspect local Git diff for performance risks
-changeproof inspect --repo . --base HEAD~1
-
-# 3. Verify peak load against local/dev environment
-changeproof verify --base HEAD~1 --target http://localhost:8001
-
-# 4. Output machine-readable JSON for CI/CD gates
-changeproof verify --base HEAD~1 --target http://192.168.1.50:8001 --json
-```
-
----
-
-## ❓ Why Not Just k6, JMeter, or Gatling?
-
-> **k6, JMeter, Gatling, and Locust are excellent load execution tools.**
-
-ChangeProof focuses on a fundamentally different question:
-* Existing tools ask: *"How many requests per second can this endpoint handle?"*
-* **ChangeProof asks**: *"Given **THIS CODE CHANGE**, what **NEW** load scenario should we run?"*
-
-Without ChangeProof, developers must manually hypothesize bottlenecks, script synthetic traffic, and maintain test scenarios for every PR. ChangeProof uses deterministic change facts and bounded AI reasoning to design the right experiment for the released diff automatically.
-
----
-
-## ❓ Why Not Just ChatGPT?
-
-A chat model can offer generic advice like *"Adding external API calls may cause latency under load."*
-
-ChangeProof connects that reasoning to:
-1. **Local code changes** in Git diffs.
-2. **Controlled load scenarios** compiled deterministically.
-3. **Actual concurrent execution** collecting per-request percentiles.
-4. **Deterministic threshold verdicts** (`PROVEN_BOTTLENECK`).
-5. **Same-experiment remediation proofs** (`PROVEN_RECOVERED`).
-
-The value is the verified end-to-end workflow, not a chat suggestion.
-
----
-
-## 🤖 The AI Role
-
-OpenAI is strictly an **information synthesis and hypothesis authority**:
-* **Generates**: Probable risk mechanisms, scenario classes, and explanations of why unit tests missed the issue.
-* **Status**: Hypotheses always remain **`PROPOSED / UNVERIFIED`**.
-* **AI never determines verdicts** and **never writes executable load scripts, shell commands, or arbitrary target URLs**.
-* The deterministic compiler clamps all load parameters, and the deterministic verifier alone evaluates runtime metrics against invariant thresholds.
-
----
-
-## 🛡️ Technical Trust Model
+AI는 코드 변경에서 검증해야 할 병목 가설과 시나리오 유형을 제안합니다. 실제 부하 크기는 안전 경계가 적용된 deterministic compiler가 결정하고, 최종 판정은 실제 측정값을 기준으로 deterministic verifier가 수행합니다.
 
 ```text
 DETERMINISTIC CHANGE ANALYSIS = FACT
-OPENAI = PERFORMANCE HYPOTHESIS (PROPOSED / UNVERIFIED)
+OPENAI = HYPOTHESIS
 CONTROLLED LOAD RUNNER = OBSERVATION
-DETERMINISTIC THRESHOLD VERIFIER = VERDICT
+DETERMINISTIC VERIFIER = VERDICT
 
-SAME LOAD EXPERIMENT
+SAME LOAD
+- SAME CONDITIONS
 - CHANGED SUBJECT
-- FAIL → PASS (p95: 4820ms → 310ms)
-= PROOF (PROVEN_RECOVERED)
+- BOTTLENECK → RECOVERED
+= PROOF
 ```
 
----
+AI 출력은 항상 `PROPOSED / UNVERIFIED`로 시작합니다. AI는 verdict를 내리지 않으며 임의의 부하 스크립트, 셸 명령 또는 public target을 실행 경로에 넣을 수 없습니다.
 
-## 🔒 Security Boundaries
+## k6, JMeter와 무엇이 다른가요?
 
-To prevent abuse or unintentional disruption:
-* **Max Concurrency**: Clamped to 150 (demo) / 200 (runner max).
-* **Max Requests**: Clamped to 300 (demo) / 1000 (runner max).
-* **Target Environment Restrictions**:
-  * Public web demo executes **only against server-owned controlled synthetic fixtures**.
-  * Local Runner **strictly restricts execution to `localhost` and RFC1918 private subnets** (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`).
-  * Arbitrary public domains and public IP addresses are rejected with `TargetSecurityError`.
-* **Zero Code Exfiltration**: Raw repository source code remains local; only bounded change facts leave the environment.
+k6, JMeter, Gatling, Locust는 부하를 실행하는 훌륭한 도구입니다. ChangeProof가 해결하려는 질문은 한 단계 앞에 있습니다.
 
----
+> 이번 코드 변경 때문에 어떤 부하 테스트를 새로 해야 하는가?
 
-## 📦 Compatibility Proofs (Secondary Vertical)
+ChangeProof는 변경된 코드에서 새로운 runtime dependency를 찾고, AI가 검증할 성능 위험을 제안한 뒤, 그 위험에 맞는 bounded load experiment를 생성하고 실제로 실행합니다.
 
-ChangeProof also preserves its deep contract verification vertical under the secondary **Compatibility Proofs** tab:
-* **Database Schema Contract Proof**: Discovers unchanged application queries referencing dropped PostgreSQL columns and reproduces engine failure (`SQLSTATE 42703 • undefined_column` $\rightarrow$ `PROVEN_FAIL` $\rightarrow$ `PROVEN_FIXED`).
-* **API Contract Proof**: Detects removed fields from OpenAPI specifications and proves client breakage under ASGI execution (`API_MISSING_RESPONSE_FIELD` $\rightarrow$ `PROVEN_FAIL` $\rightarrow$ `PROVEN_FIXED`).
+## ChatGPT에 코드를 보여주는 것과 무엇이 다른가요?
 
----
+일반 AI는 병목 가능성을 설명할 수 있지만 그 답은 제안입니다. ChangeProof는 AI 가설을 실제 동시 요청 실험으로 연결하고, 실측 latency와 queue wait을 관측한 뒤, 수정 후 같은 조건을 다시 실행해 회복까지 확인합니다.
 
-## 🧪 Testing & Verification
+> The value is not the AI answer. The value is closing the loop from reasoning to execution.
+
+## Local Runner
+
+비공개 저장소와 내부 개발 환경을 사용하는 조직을 위해 `apps/runner`가 있습니다. 실사용 구조는 Web SaaS가 private source를 직접 실행하는 방식이 아니라, 기업 개발망 안의 Local Runner가 local Git diff를 분석하고 dev/test target에 bounded load를 실행하도록 설계됐습니다.
 
 ```bash
-# Backend unit & integration suite (208 tests, 93.89% coverage)
-cd apps/api
-pytest --cov=app --cov-report=term-missing
-
-# Local runner agent suite (4 tests)
-cd apps/runner
-pytest
-
-# Frontend vitest suite (5 tests) & Next.js production build
-cd apps/web
-npm test -- --run
-npm run build
+pip install -e apps/runner
+changeproof inspect --repo . --base HEAD~1
+changeproof verify --base HEAD~1 --target http://localhost:8001
+changeproof verify --base HEAD~1 --target http://192.168.1.50:8001 --json
 ```
+
+기본 target 정책은 `localhost`와 RFC1918 사설망 개발 환경만 허용합니다. 임의 public hostname과 public IP는 거부하며, 공개 데모는 server-owned controlled fixture만 사용합니다.
+
+## 현재 범위
+
+현재 MVP의 primary proof는 FastAPI 요청 경로에 새로 추가된 외부 HTTP dependency의 latency amplification을 end-to-end로 검증합니다. 모든 성능 장애를 탐지한다고 주장하지 않습니다.
+
+Database schema와 API response contract 검증은 secondary compatibility capability로 유지됩니다. DB lock contention과 connection-pool pressure는 향후 확장 후보이며 현재 구현 범위가 아닙니다.
+
+## 검증 상태
+
+- Backend unit: 216 passed, 11 sandbox tests deselected, 93.69% coverage
+- PostgreSQL integration: 11 passed
+- Performance integration: 19 passed
+- Local Runner: 8 passed
+- Frontend: 5 passed
+- GitHub Actions: 6 jobs green on production application RC `7807251bf46bd4b309871ac7c9993c2a6155dd10`
+
+## Release identity
+
+- Production application RC: `7807251bf46bd4b309871ac7c9993c2a6155dd10`
+- Rollback RC: `a8fda49e880df1ec71fc0ba1d3fc1c8bcc2667ae`
+- Release freeze: `ACTIVE`
+
+This result applies to the bottleneck and recovery observed in this controlled load experiment and does not guarantee the performance of the entire production system.

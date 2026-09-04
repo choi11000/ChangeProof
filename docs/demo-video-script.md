@@ -1,95 +1,91 @@
 # ChangeProof — 100초 제품 시연 영상 스크립트 (Demo Video Script)
 
-* **영상 목표 시간**: 약 1분 45초 (105초)
-* **해상도 및 형식**: 1080p 60fps / 자막 포함
+* **영상 목표 시간**: 약 1분 40초 (100초, 90~110초 범위)
+* **해상도 및 형식**: 1080p 60fps / 한국어 음성 + 한국어 burn-in 자막
+* **선택 자막**: 영문 SRT 별도 파일
 * **배경 서비스**: [https://changeproof-web-production.up.railway.app](https://changeproof-web-production.up.railway.app)
-* **핵심 메시지**: *"Don't predict the failure. Reproduce it before production. Fix it, run the same experiment again, and prove the result."*
+* **핵심 슬로건**: *"사용자가 몰리기 전에, 병목을 먼저 재현하세요."*
+* **기준 RC**: `7807251bf46bd4b309871ac7c9993c2a6155dd10`
 
 ---
 
-## 타임라인 및 화면 구성 (Timeline & Visuals)
+## 타임라인 및 화면 구성 (Timeline & Visual Storyboard)
 
-### [00:00 – 00:15] 문제 제기: Diff 중심 코드 리뷰의 사각지대
+### [00:00 – 00:08] 1. 문제 제기: 기능 테스트의 맹점
 * **화면**:
-  * GitHub PR 화면 클로즈업.
-  * `migrations/001_drop_legacy_status.sql` 파일에 `ALTER TABLE orders DROP COLUMN legacy_status;`만 덩그러니 있는 diff 화면.
+  * 실제 production Hero와 `Functional PASS → Peak Load → Same Load Recovery` 흐름.
 * **내레이션 (Voiceover)**:
-  > "코드 리뷰는 '무엇이 바뀌었는가'는 잘 보여주지만, '이 변경이 실제 의존 코드를 부러뜨리는가'는 증명하지 못합니다. 특히 데이터베이스 마이그레이션은 변경되지 않은 앱 코드와 결합할 때 diff에 잡히지 않는 침묵의 배포 장애를 만듭니다."
+  > "기능 테스트가 통과했다고 실제 서비스도 안전한 것은 아닙니다. 사용자가 한꺼번에 몰리는 순간, 평소 보이지 않던 병목이 나타날 수 있습니다."
 
 ---
 
-### [00:15 – 00:30] 해결의 시작: 원클릭 데모 PR 로드
+### [00:08 – 00:20] 2. 코드 변경 팩트: 숨겨진 외부 의존성
 * **화면**:
-  * ChangeProof 웹 메인 화면 (`https://changeproof-web-production.up.railway.app`).
-  * 상단 우측 언어 전환기(`한국어 | English`) 확인.
-  * **'데모 PR 불러오기'** 버튼 클릭 $\rightarrow$ `choi11000/changeproof-demo`, PR `1` 자동 입력 $\rightarrow$ **'변경사항 분석 →'** 클릭.
+  * Git Diff 화면 포커스: `GET /dashboard` 엔드포인트에 `weather_client.get_current()` 호출이 새로 추가된 코드.
+  * ChangeProof 메인 화면 진입 (`https://changeproof-web-production.up.railway.app`).
+  * 변경 팩트 카드: `EXTERNAL_CALL_ADDED_TO_REQUEST_PATH`.
 * **내레이션 (Voiceover)**:
-  > "ChangeProof는 추측 대신 실제 재현을 선택했습니다. 실제 GitHub PR을 입력하면, 정적 분석기가 PR의 변경사항과 저장소 전체의 소스 트리를 즉시 분석합니다."
+  > "대시보드에 날씨 정보를 보여주기 위해 외부 API 호출을 추가했습니다. 개발 환경에서 단 한 번 호출할 때는 아무런 문제가 보이지 않습니다."
 
 ---
 
-### [00:30 – 00:50] 결정론적 변경 팩트 & 의존성 증거 도출
+### [00:20 – 00:32] 3. AI 부하 가설 수립: 시나리오 제안
 * **화면**:
-  * 화면 스크롤: **'구조화된 변경 팩트'** (`DROP_COLUMN orders.legacy_status`).
-  * **'영향 범위 및 의존성 증거'** 카드 클로즈업: `app/order_service.py:11`에서 `return {'id': order.id, 'status': order.legacy_status}` 코드가 하이라이트된 장면. 배지: `직접 참조`, `이번 PR에서 변경되지 않음`.
+  * '증거 기반 AI 부하 가설' 카드 포커스.
+  * 상태 배지: `PROPOSED / UNVERIFIED`.
+  * 가설 문구: *"사용자가 몰릴 경우 외부 API 응답을 기다리는 요청이 쌓여 대기열이 급증할 수 있습니다."*
 * **내레이션 (Voiceover)**:
-  > "보시다시피 마이그레이션 파일에서는 컬럼을 지웠지만, 이번 PR에서 수정되지 않은 `order_service.py` 11번째 줄에는 여전히 `legacy_status`를 직접 참조하는 코드가 남아있습니다. 결정론적 분석으로 추출한 직접 참조 증거입니다."
+  > "k6나 JMeter는 부하를 실행하지만, '이번 변경 때문에 어떤 부하 테스트를 해야 하는가'는 알려주지 못합니다. ChangeProof의 AI는 코드 변경 사실을 바탕으로 병목 가설과 시나리오를 제안합니다."
 
 ---
 
-### [00:50 – 01:05] 증거 기반 AI 추론: 안전한 실험 가설 수립
+### [00:32 – 00:55] 4. 기능 통과 & 피크 부하 실행 $\rightarrow$ 병목 재현
 * **화면**:
-  * **'증거 기반 AI 추론'** 카드 포커스.
-  * 배지: `가설 • 제안됨 (PROPOSED)`, `스키마 계약 위반`.
-  * 가설 제목: `legacy_status 컬럼 삭제 시 애플리케이션 런타임 장애 발생 가능`.
-  * 제안된 실험 계획 6단계 목록 (`격리된 PostgreSQL 프로비저닝` $\rightarrow$ `기준 스키마 적용` $\rightarrow$ `마이그레이션` $\rightarrow$ `참조 쿼리 실행`).
+  * **'피크 장애 데모 실행'** 원클릭.
+  * STEP 1: 기능 테스트 `HTTP 200 PASS` ("한 명이 사용하면 정상입니다.")
+  * STEP 4: *"피크 부하 실험 실행 중..."* 프로그레스 링.
+  * STEP 5: 붉은색 결과 카드 점등: `병목 재현됨` (`PROVEN_BOTTLENECK`).
 * **내레이션 (Voiceover)**:
-  > "OpenAI는 이 증거만을 바탕으로 구체적인 장애 메커니즘을 유추하고, 안전한 6단계 실험 계획을 세웁니다. 주목할 점은 AI가 안전 여부를 판정하지 않는다는 것입니다. 상태는 철저히 `UNVERIFIED`로 격리됩니다."
+  > "한 명이 사용할 때 기능 요청은 통과합니다. 하지만 동시 요청 150건의 피크 부하를 적용하면 숨어 있던 병목이 드러나고, 실측값을 기준으로 `PROVEN_BOTTLENECK`이 발행됩니다."
 
 ---
 
-### [01:05 – 01:25] 격리된 PostgreSQL 실험 실행: PROVEN_FAIL 재현
+### [00:55 – 01:15] 5. 실측 지표 분석: 다운스트림 큐 증폭
 * **화면**:
-  * **'격리된 PostgreSQL에서 실험 실행 →'** 버튼 클릭.
-  * 수초 내에 결과 렌더링:
-    * 붉은색 배지: `재현 완료 • PROVEN FAIL`.
-    * 5단계 실패: `단계 5: 조회 쿼리 실행 - 실패 (FAILED)`.
-    * 구체적 에러 포착: `SQLSTATE: 42703 • column "legacy_status" does not exist`.
+  * 실측 런타임 지표 테이블 클로즈업:
+    * 대표 production 실행의 candidate p95: 약 3,000ms
+    * 다운스트림 대기시간: 약 1,400ms 발생
+  * 관측 코드: `DOWNSTREAM_QUEUE_AMPLIFICATION`.
 * **내레이션 (Voiceover)**:
-  > "이제 버튼 한 번으로, 수초 내에 프로비저닝된 격리 PostgreSQL 샌드박스에서 변경사항을 직접 실행합니다. 실제 PostgreSQL 엔진이 `SQLSTATE 42703 (undefined_column)`을 반환했고, 이 controlled experiment에서 예상한 실패가 재현되어 결정론적 verifier가 `PROVEN_FAIL`을 발급합니다."
+  > "추측이 아닌 실제 측정값입니다. 대표 실행에서 candidate p95 지연시간이 약 3,000ms까지 증가했고, 외부 API 응답을 기다리는 대기열이 약 1.4초 형성됐습니다."
 
 ---
 
-### [01:25 – 01:45] 동일 실험 기반 복구 검증: PROVEN_FIXED 완성
+### [01:15 – 01:32] 6. 호환성 복구 & 동일 부하 재실행
 * **화면**:
-  * 하단 **'호환성 복구 검증'** 카드.
-  * **'복구 검증 →'** 버튼 클릭.
-  * 녹색 배지: `PROVEN FIXED`.
-  * Before (`PROVEN FAIL`, `42703`) vs After (`PROVEN PASS`).
-  * 동일 실험 계약(`contract_...`) 일치 확인.
+  * 복구 전략 안내: 짧은 캐시 + 중복 호출 병합(singleflight) + 타임아웃.
+  * **'동일 부하 다시 실행'** 버튼 클릭.
+  * 배지 확인: `SAME LOAD`, `SAME CONDITIONS`, `CHANGED SUBJECT`.
 * **내레이션 (Voiceover)**:
-  > "실패를 재현했다면 수정 후 같은 조건에서 다시 확인해야 합니다. 호환성 복구 마이그레이션으로 subject만 변경하고 동일한 실험 계약을 재실행합니다. 실패가 사라져 `PROVEN_PASS`가 관찰될 때, 이 실험 쌍에 대해 `PROVEN_FIXED`를 발급합니다. 이 proof는 PR 전체나 프로덕션 시스템의 안전성을 뜻하지 않습니다."
+  > "외부 호출을 캐싱하고 중복 요청을 병합하는 복구 코드를 적용합니다. 그리고 완전히 동일한 부하 조건으로 다시 실행합니다."
 
 ---
 
-### [01:45 – 02:00] 신뢰 아키텍처 요약 및 엔딩
+### [01:32 – 01:45] 7. 복구 증명 완료 (PROVEN_RECOVERED) & 클로징
 * **화면**:
-  * 핵심 신뢰 아키텍처 인포그래픽:
-    * `DETERMINISTIC ANALYSIS = FACT` $\rightarrow$ `OPENAI = HYPOTHESIS` $\rightarrow$ `POSTGRESQL = OBSERVATION` $\rightarrow$ `DETERMINISTIC VERIFIER = VERDICT`
-  * 로고 및 공식 슬로건 화면.
+  * 초록색 결과 카드 점등: `복구 검증 완료` (`PROVEN_RECOVERED`).
+  * 복구 후 핵심 지표: p95 1ms, 큐 대기시간 0ms.
+  * 하단 유효 범위 고지문 하이라이트.
+  * 최종 슬로건 타이틀 카드.
 * **내레이션 (Voiceover)**:
-  > "팩트는 결정론적 분석에서, 가설은 OpenAI에서, 관측은 PostgreSQL에서, verdict는 결정론적 verifier에서 나옵니다. 변경 subject만 바꾸고 동일한 실험을 재실행해 실패가 사라졌을 때 그 실험 범위의 proof가 완성됩니다. ChangeProof입니다."
+  > "동일 부하에서 p95 지연시간과 큐 대기가 회복되어 `PROVEN_RECOVERED`가 발행됐습니다. 이 결과는 해당 통제 부하 실험에만 적용됩니다. 사용자가 몰리기 전에, 병목을 먼저 재현하세요. ChangeProof입니다."
 
-> This proof applies to this controlled experiment, not to the entire pull request or production system.
+---
 
-```text
-DETERMINISTIC ANALYSIS = FACT
-OPENAI = HYPOTHESIS
-POSTGRESQL = OBSERVATION
-DETERMINISTIC VERIFIER = VERDICT
+## 편집 불변식
 
-SAME EXPERIMENT
-- CHANGED SUBJECT
-- FAIL → PASS
-= PROOF
-```
+- 실제 production 화면만 사용하고 가짜 CI, 모니터링 경고 또는 실행 결과를 합성하지 않습니다.
+- `PROPOSED`, `UNVERIFIED`, `PROVEN_BOTTLENECK`, `PROVEN_RECOVERED`, `DOWNSTREAM_QUEUE_AMPLIFICATION`, `p95`는 영문 기술 토큰으로 유지합니다.
+- 절대 처리량을 성공 훅으로 사용하지 않습니다. 화면에 보일 경우 `Controlled runtime throughput`으로만 설명합니다.
+- Korean burn-in subtitle을 기본으로 하고 English subtitle은 별도 SRT로 제공합니다.
+- 마지막 화면에 다음 범위를 유지합니다: "이 결과는 해당 통제 부하 실험에서 확인된 병목과 복구에 적용되며, 실제 운영 환경 전체의 성능을 보장하지 않습니다."
