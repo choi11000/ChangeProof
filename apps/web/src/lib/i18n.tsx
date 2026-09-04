@@ -182,7 +182,7 @@ export const translations: Record<Language, Translations> = {
 
     // Proof Summary
     proofSummaryEyebrow: "PROOF SUMMARY",
-    proofSummaryHeading: "이 controlled experiment가 보여주는 결론",
+    proofSummaryHeading: "이 실험에서 확인된 결론",
     summaryChangeLabel: "PR 변경",
     summaryChangePending: "구조화된 변경 팩트",
     summaryDependencyLabel: "미변경 의존성",
@@ -192,7 +192,8 @@ export const translations: Record<Language, Translations> = {
     summaryObservationPending: "격리 실험 실행 대기",
     summaryVerdictLabel: "결정론적 판정",
     summaryVerdictPending: "PENDING",
-    scopeInvariant: "This proof applies to this controlled experiment, not to the entire pull request or production system.",
+    scopeInvariant:
+      "이 증명은 해당 통제 실험에만 적용되며, 전체 PR이나 프로덕션 시스템의 안전성을 의미하지 않습니다.",
     deterministicDetails: "결정론적 팩트와 의존성 증거",
     hypothesisDetails: "AI 가설과 실행 계획",
     experimentDetails: "실험 단계 보기",

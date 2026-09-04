@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { I18nProvider } from "@/lib/i18n";
+import { I18nProvider, translations } from "@/lib/i18n";
 import Home from "./page";
 
 function renderHome() {
@@ -73,6 +73,15 @@ describe("Home", () => {
     expect(screen.getByLabelText(/github 저장소/i)).toHaveValue("demo/public-repo");
     expect(screen.getByLabelText(/풀 리퀘스트/i)).toHaveValue(17);
     await waitFor(() => expect(screen.getByText(/PR #17/i)).toBeInTheDocument());
+    expect(screen.getByText("이 실험에서 확인된 결론")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "이 증명은 해당 통제 실험에만 적용되며, 전체 PR이나 프로덕션 시스템의 안전성을 의미하지 않습니다.",
+      ),
+    ).toBeInTheDocument();
+    expect(translations.en.scopeInvariant).toBe(
+      "This proof applies to this controlled experiment, not to the entire pull request or production system.",
+    );
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining("/api/v1/analyses/github-pr"),
       expect.objectContaining({
