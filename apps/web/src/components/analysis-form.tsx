@@ -238,8 +238,49 @@ export function AnalysisForm() {
     };
   }, [result]);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const primaryPlan = result?.experiment_plans?.at(0) ?? null;
+  const primaryRun = primaryPlan ? experimentRuns[primaryPlan.id] : null;
+  const primaryProof = primaryPlan ? remediationProofs[primaryPlan.id] : null;
+
+  const summary = useMemo(() => {
+    if (!result) return null;
+
+    const change = result.sql_files
+      .flatMap((file) => file.analysis?.changes ?? [])
+      .at(0);
+    const run = primaryRun;
+    const proof = primaryProof;
+    const failedStep = run?.step_results.find((step) => step.status === "FAILED");
+    const changeTarget = change
+      ? [change.table, change.column].filter(Boolean).join(".")
+      : "";
+
+    return {
+      change: change
+        ? `${change.operation}${changeTarget ? ` ${changeTarget}` : ""}`
+        : t.summaryChangePending,
+      dependency:
+        result.dependency_evidence.length > 0
+          ? t.summaryDependencyFound
+          : t.summaryDependencyPending,
+      observation: proof
+        ? "FAIL → PASS"
+        : run
+          ? failedStep?.sql_state
+            ? `SQLSTATE ${failedStep.sql_state}`
+            : translateRunSummary(run.summary, lang)
+          : t.summaryObservationPending,
+      verdict: proof?.verdict ?? run?.verdict ?? t.summaryVerdictPending,
+      verdictClass:
+        proof?.verdict === "PROVEN_FIXED" || run?.verdict === "PROVEN_PASS"
+          ? "is-pass"
+          : run?.verdict === "PROVEN_FAIL"
+          ? "is-fail"
+          : "is-pending",
+    };
+  }, [lang, primaryProof, primaryRun, result, t]);
+
+  async function analyze(targetRepository: string, targetPullRequest: number) {
     setLoading(true);
     setError(null);
     setResult(null);
@@ -251,8 +292,8 @@ export function AnalysisForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          repository,
-          pull_request: Number(pullRequest),
+          repository: targetRepository,
+          pull_request: targetPullRequest,
         }),
       });
       const body = await response.json();
@@ -265,6 +306,17 @@ export function AnalysisForm() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await analyze(repository, Number(pullRequest));
+  }
+
+  async function runDemo() {
+    setRepository(demoRepository);
+    setPullRequest(demoPullRequest);
+    await analyze(demoRepository, Number(demoPullRequest));
   }
 
   async function runExperiment(fixtureId: string, planId: string) {
@@ -327,7 +379,27 @@ export function AnalysisForm() {
 
   return (
     <>
+      {demoConfigured && (
+        <section className="demo-launcher" aria-label={t.demoHint}>
+          <button
+            className="btn-live-demo"
+            disabled={loading}
+            onClick={runDemo}
+            type="button"
+          >
+            {loading ? t.analyzingBtn : t.loadDemoBtn} <span>→</span>
+          </button>
+          <div>
+            <strong>{t.demoHint}</strong>
+            <code>{t.demoScenario}</code>
+          </div>
+        </section>
+      )}
+
+      {demoConfigured && <div className="or-divider"><span>{t.orDivider}</span></div>}
+
       <form className="analysis-card" onSubmit={submit}>
+        <p className="manual-analysis-label">{t.manualAnalysisLabel}</p>
         <div className="field wide">
           <label htmlFor="repository">{t.repoLabel}</label>
           <input
@@ -354,22 +426,6 @@ export function AnalysisForm() {
         <button disabled={loading} type="submit">
           {loading ? t.analyzingBtn : t.analyzeBtn} <span>→</span>
         </button>
-        {demoConfigured && (
-          <div className="demo-load-group">
-            <button
-              className="btn-load-demo"
-              disabled={loading}
-              onClick={() => {
-                setRepository(demoRepository);
-                setPullRequest(demoPullRequest);
-              }}
-              type="button"
-            >
-              {t.loadDemoBtn}
-            </button>
-            <span className="demo-hint">{t.demoHint}</span>
-          </div>
-        )}
       </form>
 
       {error && (
@@ -385,6 +441,75 @@ export function AnalysisForm() {
 
       {result && (
         <section className="analysis-result" aria-label="Pull request analysis">
+          {summary && (
+            <section className="proof-summary" aria-label={t.proofSummaryEyebrow}>
+              <div className="proof-summary-heading">
+                <p className="eyebrow">{t.proofSummaryEyebrow}</p>
+                <h2>{t.proofSummaryHeading}</h2>
+              </div>
+              <ol className="proof-chain">
+                <li className="proof-node fact-node">
+                  <small>{t.summaryChangeLabel}</small>
+                  <strong>{summary.change}</strong>
+                </li>
+                <li className="proof-arrow" aria-hidden="true">→</li>
+                <li className="proof-node fact-node">
+                  <small>{t.summaryDependencyLabel}</small>
+                  <strong>{summary.dependency}</strong>
+                </li>
+                <li className="proof-arrow" aria-hidden="true">→</li>
+                <li className={`proof-node observation-node ${summary.verdictClass}`}>
+                  <small>{t.summaryObservationLabel}</small>
+                  <strong>{summary.observation}</strong>
+                </li>
+                <li className="proof-arrow" aria-hidden="true">→</li>
+                <li className={`proof-node verdict-node ${summary.verdictClass}`}>
+                  <small>{t.summaryVerdictLabel}</small>
+                  <strong>{summary.verdict}</strong>
+                </li>
+              </ol>
+              {primaryProof && (
+                <div className="proof-summary-invariants">
+                  <span>CONTRACT {primaryProof.same_experiment ? "SAME" : "CHANGED"}</span>
+                  <span>SUBJECT {primaryProof.subject_changed ? "CHANGED" : "SAME"}</span>
+                </div>
+              )}
+              <p className="proof-scope">{t.scopeInvariant}</p>
+              {primaryPlan && result.execution_allowed && result.controlled_fixture_id && (
+                <div className="proof-summary-action">
+                  {!primaryRun && (
+                    <button
+                      type="button"
+                      className="btn-run-experiment"
+                      disabled={executingPlanId === primaryPlan.id}
+                      onClick={() => runExperiment(result.controlled_fixture_id!, primaryPlan.id)}
+                    >
+                      {executingPlanId === primaryPlan.id
+                        ? t.runningExperimentBtn
+                        : t.runExperimentBtn}
+                    </button>
+                  )}
+                  {primaryRun?.verdict === "PROVEN_FAIL" && !primaryProof && (
+                    <button
+                      type="button"
+                      className="btn-run-experiment"
+                      disabled={provingPlanId === primaryPlan.id}
+                      onClick={() =>
+                        verifyRemediation(result.controlled_fixture_id!, primaryPlan.id)
+                      }
+                    >
+                      {provingPlanId === primaryPlan.id
+                        ? t.verifyingRemediationBtn
+                        : t.verifyRemediationBtn}
+                    </button>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
+          <details className="result-details fact-details">
+            <summary>{t.deterministicDetails}</summary>
           <div className="result-heading">
             <p className="eyebrow">{t.changeFactsEyebrow}</p>
             <h2>
@@ -511,10 +636,11 @@ export function AnalysisForm() {
               </div>
             )}
           </div>
-
-          <hr className="section-divider" />
+          </details>
 
           {/* Failure Hypotheses & Executable Experiment Planning */}
+          <details className="result-details hypothesis-details" open={!primaryRun}>
+            <summary>{t.hypothesisDetails}</summary>
           <div className="evidence-section" aria-label="Failure Hypotheses">
             <div className="evidence-heading">
               <div>
@@ -579,6 +705,8 @@ export function AnalysisForm() {
                             <strong>{t.expectedObservationLabel}</strong>{" "}
                             {translateObservation(matchingPlan.expected_observation, lang)}
                           </p>
+                          <details className="experiment-details">
+                            <summary>{t.experimentDetails}</summary>
                           <ol className="plan-steps">
                             {matchingPlan.steps.map((step) => (
                               <li key={step.order}>
@@ -589,9 +717,10 @@ export function AnalysisForm() {
                               </li>
                             ))}
                           </ol>
+                          </details>
 
                           {/* Phase 6: Run experiment action or generic limit notice */}
-                          {!executionRun && (
+                          {!executionRun && matchingPlan.id !== primaryPlan?.id && (
                             <div>
                               {result.execution_allowed && result.controlled_fixture_id ? (
                                 <button
@@ -716,7 +845,7 @@ export function AnalysisForm() {
                                   <>
                                     <h5>{t.remediationHeading}</h5>
                                     <p>{t.remediationDesc}</p>
-                                    {!remediationProof && (
+                                    {!remediationProof && matchingPlan.id !== primaryPlan?.id && (
                                       <button
                                         type="button"
                                         className="btn-run-experiment"
@@ -759,7 +888,7 @@ export function AnalysisForm() {
                                       )}
                                     </h5>
                                     <div className="proof-comparison">
-                                      <div>
+                                      <div className="proof-before">
                                         <strong>{t.beforeLabel}</strong>
                                         <span>{remediationProof.before.verdict.replace("_", " ")}</span>
                                         <code>
@@ -769,15 +898,21 @@ export function AnalysisForm() {
                                           )?.sql_state ?? "N/A"}
                                         </code>
                                       </div>
-                                      <div>
+                                      <div className="proof-contract">
                                         <strong>{t.sameExperimentLabel}</strong>
+                                        <span>
+                                          CONTRACT {remediationProof.same_experiment ? "SAME" : "CHANGED"}
+                                        </span>
+                                        <span>
+                                          SUBJECT {remediationProof.subject_changed ? "CHANGED" : "SAME"}
+                                        </span>
                                         <span>
                                           {t.contractLabel}{" "}
                                           {remediationProof.experiment_contract_digest.slice(0, 20)}
                                           ...
                                         </span>
                                       </div>
-                                      <div>
+                                      <div className="proof-after">
                                         <strong>{t.afterLabel}</strong>
                                         <span>{remediationProof.after.verdict.replace("_", " ")}</span>
                                       </div>
@@ -804,6 +939,7 @@ export function AnalysisForm() {
               <div className="empty-state">{t.noHypothesisGenerated}</div>
             )}
           </div>
+          </details>
         </section>
       )}
     </>

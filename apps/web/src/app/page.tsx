@@ -14,9 +14,6 @@ export default function Home() {
           {t.brand}
         </a>
         <div className="nav-right">
-          <span className="status">
-            <i /> {t.systemsReady}
-          </span>
           <LanguageSwitcher />
         </div>
       </nav>

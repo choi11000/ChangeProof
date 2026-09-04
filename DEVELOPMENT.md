@@ -13,7 +13,7 @@ Copy `.env.example` to `.env`. The checked-in values are local-development defau
 
 `GITHUB_TOKEN` is optional for public repositories and can avoid the anonymous API rate limit. Private repositories are rejected by default. Development-only private access requires explicitly setting `GITHUB_PUBLIC_REPOSITORIES_ONLY=false` and a fine-grained, minimum-scope token. Never place a real token in source, tests, logs, or committed documentation.
 
-`NEXT_PUBLIC_DEMO_REPOSITORY` and `NEXT_PUBLIC_DEMO_PR` optionally expose a **Load demo PR** button. It fills the form but does not analyze or execute anything. Public Next.js values must be present at build time, including through Docker build arguments.
+`NEXT_PUBLIC_DEMO_REPOSITORY` and `NEXT_PUBLIC_DEMO_PR` optionally expose a **Run Live Demo** button. It fills the form and immediately starts PR analysis, but experiment execution remains an explicit user action. Public Next.js values must be present at build time, including through Docker build arguments.
 
 ## API
 

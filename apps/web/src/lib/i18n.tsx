@@ -7,7 +7,6 @@ export type Language = "ko" | "en";
 export interface Translations {
   // Nav
   brand: string;
-  systemsReady: string;
   langKo: string;
   langEn: string;
 
@@ -40,6 +39,26 @@ export interface Translations {
   analyzingBtn: string;
   loadDemoBtn: string;
   demoHint: string;
+  demoScenario: string;
+  orDivider: string;
+  manualAnalysisLabel: string;
+
+  // Proof Summary
+  proofSummaryEyebrow: string;
+  proofSummaryHeading: string;
+  summaryChangeLabel: string;
+  summaryChangePending: string;
+  summaryDependencyLabel: string;
+  summaryDependencyFound: string;
+  summaryDependencyPending: string;
+  summaryObservationLabel: string;
+  summaryObservationPending: string;
+  summaryVerdictLabel: string;
+  summaryVerdictPending: string;
+  scopeInvariant: string;
+  deterministicDetails: string;
+  hypothesisDetails: string;
+  experimentDetails: string;
 
   // Change Facts
   changeFactsEyebrow: string;
@@ -123,16 +142,15 @@ export const translations: Record<Language, Translations> = {
   ko: {
     // Nav
     brand: "ChangeProof",
-    systemsReady: "시스템 정상 작동 중",
     langKo: "한국어",
     langEn: "English",
 
     // Hero
     heroEyebrow: "데이터베이스 변경 리스크 검증 에이전트",
-    heroTitle1: "배포 전에 변경의 안전성을",
-    heroTitle2: "직접 증명하세요.",
+    heroTitle1: "배포 전에 실패를",
+    heroTitle2: "직접 재현하세요.",
     heroLede:
-      "ChangeProof는 PR 변경사항을 검증된 증거, 결정론적 리스크, 그리고 직접 검증 가능한 복구책으로 전환합니다.",
+      "PR의 변경과 숨은 의존성을 찾아, 실제 PostgreSQL에서 깨지는지 확인합니다.",
     flowStep1: "변경사항 분석",
     flowStep2: "장애 재현 (샌드박스)",
     flowStep3: "수정 검증 (동일 실험)",
@@ -156,8 +174,28 @@ export const translations: Record<Language, Translations> = {
     prPlaceholder: "42",
     analyzeBtn: "변경사항 분석",
     analyzingBtn: "분석 중…",
-    loadDemoBtn: "데모 PR 불러오기",
-    demoHint: "준비된 SaaS 마이그레이션 데모 실행",
+    loadDemoBtn: "Live Demo 실행하기",
+    demoHint: "검증된 실패 데모를 직접 실행해 보세요",
+    demoScenario: "DROP COLUMN → 숨은 의존성 → SQLSTATE 42703",
+    orDivider: "또는",
+    manualAnalysisLabel: "GitHub 저장소와 PR을 직접 분석",
+
+    // Proof Summary
+    proofSummaryEyebrow: "PROOF SUMMARY",
+    proofSummaryHeading: "이 controlled experiment가 보여주는 결론",
+    summaryChangeLabel: "PR 변경",
+    summaryChangePending: "구조화된 변경 팩트",
+    summaryDependencyLabel: "미변경 의존성",
+    summaryDependencyFound: "숨은 애플리케이션 참조 발견",
+    summaryDependencyPending: "참조 증거 없음",
+    summaryObservationLabel: "PostgreSQL 관측",
+    summaryObservationPending: "격리 실험 실행 대기",
+    summaryVerdictLabel: "결정론적 판정",
+    summaryVerdictPending: "PENDING",
+    scopeInvariant: "This proof applies to this controlled experiment, not to the entire pull request or production system.",
+    deterministicDetails: "결정론적 팩트와 의존성 증거",
+    hypothesisDetails: "AI 가설과 실행 계획",
+    experimentDetails: "실험 단계 보기",
 
     // Change Facts
     changeFactsEyebrow: "구조화된 변경 팩트",
@@ -239,16 +277,15 @@ export const translations: Record<Language, Translations> = {
   en: {
     // Nav
     brand: "ChangeProof",
-    systemsReady: "Systems ready",
     langKo: "한국어",
     langEn: "English",
 
     // Hero
     heroEyebrow: "DATABASE CHANGE RISK AGENT",
-    heroTitle1: "Prove a change is safe",
+    heroTitle1: "Reproduce the failure",
     heroTitle2: "before it ships.",
     heroLede:
-      "ChangeProof turns pull-request changes into validated evidence, deterministic risk, and a remediation you can verify.",
+      "Find the pull request change and its hidden dependencies, then test them in real PostgreSQL.",
     flowStep1: "Analyze the change",
     flowStep2: "Reproduce the failure",
     flowStep3: "Verify the fix",
@@ -272,8 +309,28 @@ export const translations: Record<Language, Translations> = {
     prPlaceholder: "42",
     analyzeBtn: "Analyze change",
     analyzingBtn: "Analyzing…",
-    loadDemoBtn: "Load demo PR",
-    demoHint: "Try prepared risky SaaS migration",
+    loadDemoBtn: "Run Live Demo",
+    demoHint: "Try the proven failure demo",
+    demoScenario: "DROP COLUMN → hidden dependency → SQLSTATE 42703",
+    orDivider: "or",
+    manualAnalysisLabel: "Analyze a GitHub repository and pull request manually",
+
+    // Proof Summary
+    proofSummaryEyebrow: "PROOF SUMMARY",
+    proofSummaryHeading: "What this controlled experiment concludes",
+    summaryChangeLabel: "PR change",
+    summaryChangePending: "Structured change fact",
+    summaryDependencyLabel: "Unchanged dependency",
+    summaryDependencyFound: "Hidden application reference found",
+    summaryDependencyPending: "No reference evidence",
+    summaryObservationLabel: "PostgreSQL observation",
+    summaryObservationPending: "Waiting for isolated experiment",
+    summaryVerdictLabel: "Deterministic verdict",
+    summaryVerdictPending: "PENDING",
+    scopeInvariant: "This proof applies to this controlled experiment, not to the entire pull request or production system.",
+    deterministicDetails: "Deterministic facts and dependency evidence",
+    hypothesisDetails: "AI hypothesis and experiment plan",
+    experimentDetails: "View experiment steps",
 
     // Change Facts
     changeFactsEyebrow: "STRUCTURED CHANGE FACTS",

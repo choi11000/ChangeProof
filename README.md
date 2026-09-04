@@ -20,11 +20,10 @@ It turns database schema migrations in GitHub pull requests into deterministic f
 
 ### How to Run:
 1. Open the [Live Web Service](https://changeproof-web-production.up.railway.app).
-2. Click **'데모 PR 불러오기'** (or **'Load Demo PR'** in English).
-3. Click **'변경사항 분석 →'** (`Analyze change`).
-4. Review the detected `DROP_COLUMN orders.legacy_status` fact, the cross-layer dependency evidence in `app/order_service.py:11`, and the AI failure hypothesis.
-5. Click **'격리된 PostgreSQL에서 실험 실행 →'** (`Run experiment in isolated PostgreSQL`) to witness actual database execution failure (`SQLSTATE 42703 • undefined_column`) $\rightarrow$ **`PROVEN_FAIL`**.
-6. Click **'복구 검증 →'** (`Verify remediation`) to run the **exact same experiment contract** against compatibility-remediated code $\rightarrow$ **`PROVEN_FIXED`**.
+2. Click **'Live Demo 실행하기'** (or **'Run Live Demo'** in English); the configured demo analysis starts immediately.
+3. Review the `Proof Summary`, detected `DROP_COLUMN orders.legacy_status` fact, cross-layer dependency evidence in `app/order_service.py:11`, and the AI failure hypothesis.
+4. Click **'격리된 PostgreSQL에서 실험 실행 →'** (`Run experiment in isolated PostgreSQL`) to witness actual database execution failure (`SQLSTATE 42703 • undefined_column`) $\rightarrow$ **`PROVEN_FAIL`**.
+5. Click **'복구 검증 →'** (`Verify remediation`) to run the **exact same experiment contract** against compatibility-remediated code $\rightarrow$ **`PROVEN_FIXED`**.
 
 ---
 
@@ -45,7 +44,7 @@ Unchanged Application Source (NOT in the PR diff):
   order_dict = {"id": order.id, "status": order.legacy_status}  <-- RUNTIME CRASH!
 ```
 
-Because diff-only reviews do not inspect unchanged application files, and speculative AI reviewers merely generate probabilistic risk scores, breaking migrations routinely escape to production.
+Diff-only review can miss unchanged application dependencies, while speculative AI reviewers can only generate probabilistic risk signals without runtime observation.
 
 ---
 

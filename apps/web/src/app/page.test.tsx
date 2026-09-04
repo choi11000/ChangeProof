@@ -22,44 +22,63 @@ describe("Home", () => {
   it("renders the pull request analysis form in Korean by default", () => {
     renderHome();
 
-    expect(screen.getByRole("heading", { name: /배포 전에 변경의 안전성을/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /배포 전에 실패를 직접 재현하세요/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/github 저장소/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /변경사항 분석/i })).toBeInTheDocument();
     expect(screen.getByRole("list", { name: /3단계 증명 흐름/i })).toHaveTextContent(
       /변경사항 분석/i,
     );
-    expect(screen.queryByRole("button", { name: /데모 pr 불러오기/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /live demo 실행하기/i })).not.toBeInTheDocument();
   });
 
   it("switches language between Korean and English when language button is clicked", () => {
     renderHome();
 
     // Default is Korean
-    expect(screen.getByRole("heading", { name: /배포 전에 변경의 안전성을/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /배포 전에 실패를 직접 재현하세요/i })).toBeInTheDocument();
 
     // Switch to English
     fireEvent.click(screen.getByRole("button", { name: "English" }));
-    expect(screen.getByRole("heading", { name: /prove a change is safe/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /reproduce the failure before it ships/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /analyze change/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/github repository/i)).toBeInTheDocument();
 
     // Switch back to Korean
     fireEvent.click(screen.getByRole("button", { name: "한국어" }));
-    expect(screen.getByRole("heading", { name: /배포 전에 변경의 안전성을/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /배포 전에 실패를 직접 재현하세요/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /변경사항 분석/i })).toBeInTheDocument();
   });
 
-  it("loads configured demo values without starting analysis", () => {
+  it("starts analysis immediately with configured demo values", async () => {
     vi.stubEnv("NEXT_PUBLIC_DEMO_REPOSITORY", "demo/public-repo");
     vi.stubEnv("NEXT_PUBLIC_DEMO_PR", "17");
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          pull_request: { number: 17, title: "Demo failure", changed_files: 0, html_url: "" },
+          changed_files: [],
+          sql_files: [],
+          dependency_targets: [],
+          dependency_evidence: [],
+          impact_summary: null,
+          warnings: [],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
     renderHome();
 
-    fireEvent.click(screen.getByRole("button", { name: /데모 pr 불러오기/i }));
+    fireEvent.click(screen.getByRole("button", { name: /live demo 실행하기/i }));
 
     expect(screen.getByLabelText(/github 저장소/i)).toHaveValue("demo/public-repo");
     expect(screen.getByLabelText(/풀 리퀘스트/i)).toHaveValue(17);
-    expect(fetchSpy).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText(/PR #17/i)).toBeInTheDocument());
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/analyses/github-pr"),
+      expect.objectContaining({
+        body: JSON.stringify({ repository: "demo/public-repo", pull_request: 17 }),
+      }),
+    );
   });
 
   it("submits a PR and renders deterministic change facts", async () => {
@@ -362,6 +381,8 @@ describe("Home", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /복구 검증/i }));
     await waitFor(() => expect(screen.getByText("PROVEN FIXED")).toBeInTheDocument());
+    expect(screen.getByText("PROVEN_FIXED")).toBeInTheDocument();
+    expect(screen.getByText("FAIL → PASS")).toBeInTheDocument();
     expect(screen.getByText(/동일 실험: 예/i)).toBeInTheDocument();
     expect(screen.getByText(/대상 변경: 예/i)).toBeInTheDocument();
   });
