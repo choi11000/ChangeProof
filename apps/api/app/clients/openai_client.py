@@ -35,7 +35,8 @@ SYSTEM_PROMPT = (
     "4. Do NOT produce executable shell commands or arbitrary code.\n"
     "5. Select the appropriate experiment_template from the allowed list: "
     "DROPPED_COLUMN_REFERENCE, DROPPED_TABLE_REFERENCE, NOT_NULL_COMPATIBILITY, "
-    "ALTER_TYPE_COMPATIBILITY, MIGRATION_APPLY, API_RESPONSE_FIELD_COMPATIBILITY.\n"
+    "ALTER_TYPE_COMPATIBILITY, MIGRATION_APPLY, API_RESPONSE_FIELD_COMPATIBILITY, "
+    "EXTERNAL_DEPENDENCY_LATENCY.\n"
     "6. If there is insufficient evidence to warrant a failure hypothesis, return an empty list. "
     "Propose at most 3 hypotheses."
 )

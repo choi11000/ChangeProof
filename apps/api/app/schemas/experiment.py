@@ -10,6 +10,7 @@ class ExperimentTemplate(StrEnum):
     NOT_NULL_COMPATIBILITY = "NOT_NULL_COMPATIBILITY"
     ALTER_TYPE_COMPATIBILITY = "ALTER_TYPE_COMPATIBILITY"
     API_RESPONSE_FIELD_COMPATIBILITY = "API_RESPONSE_FIELD_COMPATIBILITY"
+    EXTERNAL_DEPENDENCY_LATENCY = "EXTERNAL_DEPENDENCY_LATENCY"
 
 
 class ExperimentStatus(StrEnum):
@@ -28,6 +29,10 @@ class ExperimentStepType(StrEnum):
     SEND_HTTP_REQUEST = "SEND_HTTP_REQUEST"
     PROBE_RESPONSE_FIELD = "PROBE_RESPONSE_FIELD"
     CAPTURE_API_RESULT = "CAPTURE_API_RESULT"
+    INITIALIZE_LOAD_ENVIRONMENT = "INITIALIZE_LOAD_ENVIRONMENT"
+    RUN_BASELINE_LOAD = "RUN_BASELINE_LOAD"
+    RUN_CONCURRENT_LOAD = "RUN_CONCURRENT_LOAD"
+    CAPTURE_PERFORMANCE_METRICS = "CAPTURE_PERFORMANCE_METRICS"
 
 
 class ExperimentStep(BaseModel):
@@ -38,6 +43,8 @@ class ExperimentStep(BaseModel):
     endpoint: str | None = None
     method: str | None = None
     field_name: str | None = None
+    concurrency: int | None = None
+    request_count: int | None = None
 
 
 class ExperimentPlan(BaseModel):
@@ -66,6 +73,8 @@ def compute_plan_digest(plan: ExperimentPlan) -> str:
                     "sql": s.sql,
                     "endpoint": s.endpoint,
                     "field_name": s.field_name,
+                    "concurrency": s.concurrency,
+                    "request_count": s.request_count,
                 }
                 for s in plan.steps
             ],

@@ -73,6 +73,15 @@ class PlanningContextBudgeter:
                         column=item.api_change.field_name,
                     )
                 )
+            elif item.performance_change:
+                change_summaries.append(
+                    ChangeFactSummary(
+                        id=item.id,
+                        operation=item.performance_change.change_type.value,
+                        table=item.performance_change.endpoint,
+                        column=item.performance_change.downstream_symbol,
+                    )
+                )
 
         return FailurePlanningContext(
             head_sha=head_sha,
