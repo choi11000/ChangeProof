@@ -22,25 +22,64 @@ The runtime status is backed by GitHub Actions run `33747973539`: PostgreSQL 17.
 The product promise is not merely to predict failure:
 > Don't predict the failure. Reproduce it before production.
 
+## Architecture Overview: Dual Proof Verticals
+
+ChangeProof supports two proof verticals powered by a common deterministic proof engine:
+
+```text
+                    GitHub PR
+                        │
+                Change Analysis
+                        │
+                ┌───────┴───────┐
+                │               │
+             DATABASE          API
+                │               │
+           ChangeFact       ChangeFact
+                │               │
+              Evidence        Evidence
+                └───────┬───────┘
+                        │
+                     OpenAI
+                   HYPOTHESIS
+                        │
+                Experiment Compiler
+                        │
+                ┌───────┴───────┐
+                │               │
+          PostgreSQL        API Runtime
+          Observation       Observation
+                │               │
+                └───────┬───────┘
+                        │
+               Deterministic Verifier
+                        │
+                      PROOF
+```
+
 ## Runtime components
 
-- `apps/web`: Next.js App Router interface for PR input, change facts, dependency evidence, failure hypotheses, experiment plans, and observed PostgreSQL execution results.
+- `apps/web`: Next.js App Router interface for PR input, change facts, dependency evidence, failure hypotheses, experiment plans, and observed execution results for both Database Schema and API Contract domains.
 - `apps/api`: FastAPI HTTP boundary, PR analysis pipeline, and experiment execution router.
 - `clients/github.py`: timeout-bounded GitHub REST access for PRs, files, and repository trees.
 - `clients/openai_client.py`: timeout-bounded OpenAI client using Responses API with Structured Outputs.
-- `services/pull_request_service.py`: change-intake, dependency discovery, and planning orchestration.
-- `services/controlled_demo_policy.py`: exact server-side demo identity authorization (exact repository, PR number, and audited head SHA; no substring matching).
+- `services/pull_request_service.py`: change-intake, dependency discovery, and planning orchestration across SQL and OpenAPI documents.
+- `services/controlled_demo_policy.py`: exact server-side demo identity authorization (exact repository, PR number, and audited head SHA for both Database and API demo repositories; no substring matching).
 - `services/repository_source_service.py`: bounded source snapshot collection at PR head SHA.
 - `services/failure_planning_service.py`: safe failure planning orchestration and domain validation.
 - `services/planning_context_budget.py`: deterministic change/evidence/warning selection with transparent truncation statistics.
 - `services/ai_planning_cache.py`: bounded TTL planning cache and same-fingerprint async single-flight.
-- `services/experiment_execution_service.py`: controlled fixture validation, executor invocation, and deterministic verdict synthesis.
-- `analyzers/file_classifier.py`: deterministic path-based classification and content policy.
+- `services/experiment_execution_service.py`: controlled fixture validation, executor invocation (Postgres or API), and deterministic verdict synthesis.
+- `analyzers/file_classifier.py`: deterministic path-based classification and content policy (SQL migrations and OpenAPI 3.x specifications).
+- `analyzers/openapi_parser.py`: deterministic OpenAPI 3.x parsing, local `$ref` resolution, cyclic protection, remote `$ref` rejection, and `REMOVE_RESPONSE_FIELD` ChangeFact generation.
+- `analyzers/api_dependency.py`: deterministic consumer dependency discovery for direct API response field references.
 - `analyzers/dependency.py`: deterministic target extraction, reference matching, and impact summary.
 - `analyzers/experiment_compiler.py`: deterministic compiler generating executable, read-oriented experiment plans.
-- `analyzers/experiment_verifier.py`: deterministic verifier attributing PostgreSQL observations to `PROVEN_FAIL` / `PROVEN_PASS` / `INCONCLUSIVE` / `EXECUTION_ERROR`.
-- `schemas/experiment_identity.py`: canonical, server-owned SHA-256 identities separating the stable experiment contract from the executed migration subject.
+- `analyzers/experiment_verifier.py`: deterministic verifier attributing observations (`SQLSTATE 42703` or `API_MISSING_RESPONSE_FIELD`) to `PROVEN_FAIL` / `PROVEN_PASS` / `INCONCLUSIVE` / `EXECUTION_ERROR`.
+- `schemas/experiment_identity.py`: canonical, server-owned SHA-256 identities separating the stable experiment contract from the executed subject.
 - `executors/postgres_experiment.py`: ephemeral schema isolation (`cp_run_<hex12>`), statement/lock timeouts, and secret-redacted execution runner.
+- `executors/api_experiment.py`: in-process Starlette ASGI fixture execution with real HTTP request/response and deterministic consumer probe without network egress.
+- `fixtures/api_fixtures.py`: server-controlled registry of synthetic API contract fixtures (`api-contract/remove-user-email`).
 - `fixtures/experiment_registry.py`: server-controlled registry of synthetic demo fixtures.
 - `choi11000/changeproof-demo`: public synthetic demonstration repository with audited demo PR #1.
 - `samples/risky-saas`: local synthetic demonstration repository mirroring the demo schema.

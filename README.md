@@ -124,13 +124,19 @@ flowchart TD
 
 ---
 
-## 📦 Current MVP Scope
+## 📦 Implemented Scope & Roadmap
 
-* **Version Control**: GitHub public repositories and pull requests.
-* **Database**: PostgreSQL 17 (SQL DDL migrations).
-* **Application Languages**: Python application code (expandable to TypeScript, Go, Java).
-* **Sandbox Execution**: Ephemeral PostgreSQL schema namespaces with 5s statement timeouts, 2s lock timeouts, and automated `finally` cleanup.
-* **Cost & Safety**: In-memory single-flight lock, AI context budgeter, strict rate limits, and public-only intake.
+### Implemented Verticals
+* **Database Schema Changes**: PostgreSQL DDL migrations (`DROP_COLUMN`, `DROP_TABLE`, `ALTER_COLUMN_TYPE`, `NOT NULL`, `DEFAULT`). Deterministic `sqlglot` AST parsing, cross-layer application code dependency discovery, ephemeral schema sandbox execution, exact `SQLSTATE 42703` observation, and `PROVEN_FAIL` → `PROVEN_FIXED` remediation proof.
+* **API Contract Changes**: OpenAPI 3.x specifications (`openapi.yaml`, `openapi.yml`, `openapi.json`). Deterministic base-vs-head diffing for `REMOVE_RESPONSE_FIELD`, consumer client dependency discovery (`response["field"]`), in-process Starlette ASGI controlled runtime, exact `API_MISSING_RESPONSE_FIELD` observation, and same-experiment compatibility remediation proof.
+* **Source & Pull Requests**: GitHub public repositories and pull requests with exact demo authorization guardrails.
+* **Security & Isolation**: Zero arbitrary repository execution (no `npm/pip install`, no shell/subprocess, no external network egress).
+
+### Future Roadmap (PLANNED)
+* **Supply-chain behavioral proof** (process, network, filesystem isolation) — *FUTURE*
+* **Event & Message Schema breaking changes** (Kafka, Protobuf, Avro) — *FUTURE*
+* **Infrastructure & Configuration contract validation** — *FUTURE*
+* **Additional Database engines** (MySQL, SQLite) — *FUTURE*
 
 ---
 
