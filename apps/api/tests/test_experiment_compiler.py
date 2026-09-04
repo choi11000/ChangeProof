@@ -231,3 +231,55 @@ def test_compiler_never_emits_shell_command() -> None:
         for token in forbidden_tokens:
             assert token not in desc_lower
             assert token not in sql_lower
+
+
+def test_compile_external_dependency_latency() -> None:
+    from app.schemas.performance import PerformanceChange, PerformanceChangeType
+
+    compiler = ExperimentCompiler()
+    hypothesis = FailureHypothesis(
+        id="hyp_perf_01",
+        category=FailureCategory.EXTERNAL_DEPENDENCY_BOTTLENECK,
+        title="Weather API Latency Amplification",
+        statement="Under peak load, weather dependency causes queue saturation",
+        change_ids=["c_perf"],
+        evidence_ids=["e_perf"],
+        rationale="Synchronous downstream call added to request path",
+        expected_failure_mode="DOWNSTREAM_QUEUE_AMPLIFICATION",
+        assumptions=["Peak traffic arrives"],
+        experiment_template=ExperimentTemplate.EXTERNAL_DEPENDENCY_LATENCY,
+    )
+    fact = ChangeFact(
+        id="c_perf",
+        domain="PERFORMANCE",
+        performance_change=PerformanceChange(
+            change_type=PerformanceChangeType.EXTERNAL_CALL_ADDED_TO_REQUEST_PATH,
+            endpoint="GET /dashboard",
+            source_file="app/dashboard.py",
+            line=42,
+            downstream_symbol="weather_client.get_current",
+        ),
+    )
+    evidence = DependencyEvidence(
+        id="e_perf",
+        target=DependencyTarget(
+            type=DependencyTargetType.PERFORMANCE_ENDPOINT,
+            path="/dashboard",
+            table="",
+            change_ids=["c_perf"],
+        ),
+        path="app/dashboard.py",
+        line=42,
+        match_kind=DependencyMatchKind.QUALIFIED_REFERENCE,
+        excerpt="GET /dashboard -> weather_client.get_current",
+        source_scope=SourceScope.APPLICATION,
+    )
+
+    plan = compiler.compile(hypothesis, [fact], [evidence])
+    assert plan.template == ExperimentTemplate.EXTERNAL_DEPENDENCY_LATENCY
+    assert len(plan.steps) == 3
+    assert plan.steps[0].type == ExperimentStepType.INITIALIZE_LOAD_ENVIRONMENT
+    assert plan.steps[1].type == ExperimentStepType.RUN_CONCURRENT_LOAD
+    assert plan.steps[1].concurrency == 150
+    assert plan.steps[2].type == ExperimentStepType.CAPTURE_PERFORMANCE_METRICS
+    assert plan.plan_digest is not None

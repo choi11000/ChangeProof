@@ -289,6 +289,37 @@ class ExperimentCompiler:
                 f"on '{field_name}'"
             )
 
+        elif template is ExperimentTemplate.EXTERNAL_DEPENDENCY_LATENCY:
+            perf_change = matching_changes[0].performance_change
+            endpoint = perf_change.endpoint if perf_change else "GET /dashboard"
+            method = perf_change.method if perf_change else "GET"
+            symbol = perf_change.downstream_symbol if perf_change else "external_client"
+            steps = [
+                ExperimentStep(
+                    order=1,
+                    type=ExperimentStepType.INITIALIZE_LOAD_ENVIRONMENT,
+                    description="Initialize ShiftSafe controlled runtime environment with downstream capacity model",
+                ),
+                ExperimentStep(
+                    order=2,
+                    type=ExperimentStepType.RUN_CONCURRENT_LOAD,
+                    description=f"Execute 150 concurrent peak-load requests against {endpoint}",
+                    endpoint=endpoint,
+                    method=method,
+                    concurrency=150,
+                    request_count=300,
+                ),
+                ExperimentStep(
+                    order=3,
+                    type=ExperimentStepType.CAPTURE_PERFORMANCE_METRICS,
+                    description="Capture response percentiles (p50/p95/p99), downstream wait time, and timeout rate",
+                ),
+            ]
+            expected_observation = (
+                f"Peak concurrency is expected to saturate downstream capacity on '{symbol}', "
+                "causing queue accumulation, p95 latency amplification, and potential timeouts"
+            )
+
         raw_id = f"{hypothesis.id}:{template.value}:{':'.join(hypothesis.change_ids)}"
         digest = hashlib.sha256(raw_id.encode("utf-8")).hexdigest()[:12]
         plan_id = f"plan_{digest}"
