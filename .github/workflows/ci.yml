@@ -100,7 +100,7 @@ jobs:
           cache-dependency-path: apps/api/pyproject.toml
       - run: python -m pip install --upgrade pip
       - run: pip install -e ".[dev]"
-      - run: pytest tests/test_performance_sensitivity.py tests/test_performance_verifier_and_proof.py tests/test_change_awareness.py tests/test_performance_analyzer.py tests/test_performance_experiment.py -v
+      - run: pytest tests/test_performance_sensitivity.py tests/test_performance_verifier_and_proof.py tests/test_change_awareness.py tests/test_performance_analyzer.py tests/test_performance_experiment.py -v --no-cov
 
   runner:
     runs-on: ubuntu-latest
