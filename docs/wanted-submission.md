@@ -13,8 +13,10 @@
 * **공개 웹 서비스**: [https://changeproof-web-production.up.railway.app](https://changeproof-web-production.up.railway.app)
 * **공개 API 엔드포인트**: [https://changeproof-api-production.up.railway.app](https://changeproof-api-production.up.railway.app)
 * **공개 GitHub 저장소**: [https://github.com/choi11000/ChangeProof](https://github.com/choi11000/ChangeProof)
-* **공식 데모 저장소**: [https://github.com/choi11000/changeproof-demo](https://github.com/choi11000/changeproof-demo)
-* **공식 데모 풀 리퀘스트**: [https://github.com/choi11000/changeproof-demo/pull/1](https://github.com/choi11000/changeproof-demo/pull/1)
+* **공식 데모 저장소 (DB)**: [https://github.com/choi11000/changeproof-demo](https://github.com/choi11000/changeproof-demo)
+* **공식 데모 풀 리퀘스트 (DB)**: [https://github.com/choi11000/changeproof-demo/pull/1](https://github.com/choi11000/changeproof-demo/pull/1)
+* **공식 데모 저장소 (API)**: [https://github.com/choi11000/changeproof-api-demo](https://github.com/choi11000/changeproof-api-demo)
+* **공식 데모 풀 리퀘스트 (API)**: [https://github.com/choi11000/changeproof-api-demo/pull/1](https://github.com/choi11000/changeproof-api-demo/pull/1)
 
 ---
 
@@ -29,12 +31,12 @@
   > **코드 리뷰의 추측을 실제 데이터베이스 증거로 증명합니다.**
 
 ### B. 매우 짧은 설명 (100–150자)
-* **글자 수**: 138자 (공백 포함)
-> ChangeProof는 GitHub PR의 데이터베이스 변경사항과 미변경 소스코드 간의 숨은 의존성을 추적하고, 특정 변경으로 발생 가능한 런타임 실패를 격리된 PostgreSQL 샌드박스에서 재현하여 관찰된 SQLSTATE로 결정론적 verdict를 생성하는 실행형 검증 에이전트입니다.
+* **글자 수**: 142자 (공백 포함)
+> ChangeProof는 GitHub PR의 PostgreSQL 스키마 변경 및 OpenAPI 응답 계약 변경과 미변경 소스코드 간의 숨은 의존성을 추적하고, 특정 변경으로 발생 가능한 런타임 실패를 격리된 샌드박스에서 직접 재현하여 관찰된 증거로 결정론적 verdict를 생성하는 실행형 검증 에이전트입니다.
 
 ### C. 짧은 설명 (250–400자)
-* **글자 수**: 352자 (공백 포함)
-> 현대의 코드 리뷰와 AI 리뷰어는 "무엇이 바뀌었는가"와 "위험해 보이는가"는 답하지만, "이 변경이 실제 의존 코드를 부러뜨리는가"는 증명하지 못합니다. 스키마 변경은 diff에 없는 미변경 코드와 결합할 때 치명적인 장애를 만듭니다. ChangeProof는 PR의 SQL 마이그레이션과 앱 소스코드를 분석해 의존성 증거를 도출하고, AI로 구체적 장애 가설을 세운 뒤, 격리된 PostgreSQL에서 특정 실패를 재현해 `PROVEN_FAIL` verdict를 생성합니다. 호환성 복구 후 동일한 실험을 다시 실행해 관찰된 실패가 사라진 경우에만 `PROVEN_PASS`와 실험 범위의 `PROVEN_FIXED`를 제공합니다.
+* **글자 수**: 385자 (공백 포함)
+> 현대의 코드 리뷰와 AI 리뷰어는 "무엇이 바뀌었는가"와 "위험해 보이는가"는 답하지만, "이 변경이 실제 의존 코드를 부러뜨리는가"는 증명하지 못합니다. 스키마와 API 계약 변경은 diff에 없는 미변경 코드와 결합할 때 치명적인 런타임 장애를 만듭니다. ChangeProof는 PR의 SQL 마이그레이션 및 OpenAPI 스펙과 앱 소스코드를 분석해 의존성 증거를 도출하고, AI로 구체적 장애 가설을 세운 뒤, 격리된 런타임에서 특정 실패(`SQLSTATE 42703`, `API_MISSING_RESPONSE_FIELD`)를 재현해 `PROVEN_FAIL`을 생성합니다. 호환성 복구 후 동일한 실험을 다시 실행해 관찰된 실패가 사라진 경우에만 `PROVEN_PASS`와 `PROVEN_FIXED`를 제공합니다.
 
 ### D. 전체 프로젝트 상세 소개 (800–1200자)
 * **글자 수**: 1,074자 (공백 포함)
