@@ -9,6 +9,7 @@ class ExperimentTemplate(StrEnum):
     DROPPED_TABLE_REFERENCE = "DROPPED_TABLE_REFERENCE"
     NOT_NULL_COMPATIBILITY = "NOT_NULL_COMPATIBILITY"
     ALTER_TYPE_COMPATIBILITY = "ALTER_TYPE_COMPATIBILITY"
+    API_RESPONSE_FIELD_COMPATIBILITY = "API_RESPONSE_FIELD_COMPATIBILITY"
 
 
 class ExperimentStatus(StrEnum):
@@ -23,6 +24,10 @@ class ExperimentStepType(StrEnum):
     APPLY_MIGRATION = "APPLY_MIGRATION"
     RUN_READ_QUERY = "RUN_READ_QUERY"
     CAPTURE_RESULT = "CAPTURE_RESULT"
+    PREPARE_API_ENVIRONMENT = "PREPARE_API_ENVIRONMENT"
+    SEND_HTTP_REQUEST = "SEND_HTTP_REQUEST"
+    PROBE_RESPONSE_FIELD = "PROBE_RESPONSE_FIELD"
+    CAPTURE_API_RESULT = "CAPTURE_API_RESULT"
 
 
 class ExperimentStep(BaseModel):
@@ -30,6 +35,9 @@ class ExperimentStep(BaseModel):
     type: ExperimentStepType
     description: str
     sql: str | None = None
+    endpoint: str | None = None
+    method: str | None = None
+    field_name: str | None = None
 
 
 class ExperimentPlan(BaseModel):
@@ -51,7 +59,16 @@ def compute_plan_digest(plan: ExperimentPlan) -> str:
     canonical = json.dumps(
         {
             "template": plan.template,
-            "steps": [{"order": s.order, "type": s.type, "sql": s.sql} for s in plan.steps],
+            "steps": [
+                {
+                    "order": s.order,
+                    "type": s.type,
+                    "sql": s.sql,
+                    "endpoint": s.endpoint,
+                    "field_name": s.field_name,
+                }
+                for s in plan.steps
+            ],
             "expected_observation": plan.expected_observation,
         },
         sort_keys=True,

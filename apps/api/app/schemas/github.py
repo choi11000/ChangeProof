@@ -3,6 +3,7 @@ from enum import StrEnum
 from pydantic import BaseModel, Field
 
 from app.schemas.ai import AIUsageMetadata
+from app.schemas.api_contract import ApiChange
 from app.schemas.dependency import (
     ChangeFact,
     DependencyEvidence,
@@ -65,6 +66,7 @@ class ChangedFile(BaseModel):
 class FileCategory(StrEnum):
     SQL_MIGRATION = "SQL_MIGRATION"
     DATABASE_SCHEMA = "DATABASE_SCHEMA"
+    OPENAPI_SPEC = "OPENAPI_SPEC"
     APPLICATION = "APPLICATION"
     CONFIG = "CONFIG"
     TEST = "TEST"
@@ -104,12 +106,21 @@ class SqlFileAnalysis(BaseModel):
     error: str | None = None
 
 
+class ApiFileAnalysis(BaseModel):
+    path: str
+    status: ChangedFileStatus
+    content_sha: str | None = None
+    changes: list[ApiChange] = Field(default_factory=list)
+    error: str | None = None
+
+
 class AnalysisWarningCode(StrEnum):
     PATCH_UNAVAILABLE = "PATCH_UNAVAILABLE"
     FILE_CONTENT_UNAVAILABLE = "FILE_CONTENT_UNAVAILABLE"
     SKIPPED_TOO_LARGE = "SKIPPED_TOO_LARGE"
     REMOVED_SQL_NOT_ANALYZED = "REMOVED_SQL_NOT_ANALYZED"
     SQL_PARSE_ERROR = "SQL_PARSE_ERROR"
+    OPENAPI_PARSE_ERROR = "OPENAPI_PARSE_ERROR"
     REPOSITORY_TREE_TRUNCATED = "REPOSITORY_TREE_TRUNCATED"
     SOURCE_SCAN_LIMIT_REACHED = "SOURCE_SCAN_LIMIT_REACHED"
     SOURCE_FILE_TOO_LARGE = "SOURCE_FILE_TOO_LARGE"
@@ -134,6 +145,8 @@ class AnalysisStep(StrEnum):
     CLASSIFY_FILES = "CLASSIFY_FILES"
     FETCH_SQL_CONTENT = "FETCH_SQL_CONTENT"
     ANALYZE_SQL = "ANALYZE_SQL"
+    FETCH_OPENAPI_CONTENT = "FETCH_OPENAPI_CONTENT"
+    ANALYZE_OPENAPI = "ANALYZE_OPENAPI"
     BUILD_CHANGE_FACTS = "BUILD_CHANGE_FACTS"
     EXTRACT_DEPENDENCY_TARGETS = "EXTRACT_DEPENDENCY_TARGETS"
     FETCH_REPOSITORY_TREE = "FETCH_REPOSITORY_TREE"
@@ -150,6 +163,8 @@ class PullRequestAnalysis(BaseModel):
     pull_request: PullRequestMetadata
     changed_files: list[ClassifiedFile]
     sql_files: list[SqlFileAnalysis]
+    api_files: list[ApiFileAnalysis] = Field(default_factory=list)
+    domain: str = "DATABASE"
     change_facts: list[ChangeFact] = Field(default_factory=list)
     dependency_targets: list[DependencyTarget] = Field(default_factory=list)
     dependency_evidence: list[DependencyEvidence] = Field(default_factory=list)

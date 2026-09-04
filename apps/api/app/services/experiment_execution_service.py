@@ -5,10 +5,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from app.analyzers.experiment_verifier import ExperimentVerifier
+from app.executors.api_experiment import ApiExperimentExecutor
 from app.executors.postgres_experiment import (
     FixtureExecutionResult,
     PostgresExperimentExecutor,
 )
+from app.fixtures.api_fixtures import ControlledApiFixture, get_controlled_api_fixture
 from app.fixtures.experiment_registry import (
     ControlledExperimentFixture,
     get_controlled_fixture,
@@ -37,16 +39,26 @@ class ExperimentExecutionService:
 
     def __init__(
         self,
-        executor: PostgresExperimentExecutor,
+        executor: PostgresExperimentExecutor | None = None,
         verifier: ExperimentVerifier | None = None,
+        api_executor: ApiExperimentExecutor | None = None,
         *,
         repo_root: Path | None = None,
     ) -> None:
         self.executor = executor
+        self.api_executor = api_executor or ApiExperimentExecutor()
         self.verifier = verifier or ExperimentVerifier()
         self.repo_root = repo_root or get_repo_root()
 
     def execute(self, request: ExecuteExperimentRequest) -> ExperimentRun:
+        api_fixture = get_controlled_api_fixture(request.fixture_id)
+        if api_fixture is not None:
+            return self.execute_controlled_api_fixture(
+                api_fixture,
+                experiment_plan_id=request.experiment_plan_id,
+                variant="changed",
+            )
+
         fixture = get_controlled_fixture(request.fixture_id)
         if fixture is None:
             raise UnknownFixtureError(
@@ -58,6 +70,35 @@ class ExperimentExecutionService:
             fixture,
             experiment_plan_id=request.experiment_plan_id,
             subject_variant="original",
+        )
+
+    def execute_controlled_api_fixture(
+        self,
+        fixture: ControlledApiFixture,
+        *,
+        experiment_plan_id: str | None = None,
+        variant: str = "changed",
+    ) -> ExperimentRun:
+        started_at = datetime.now(UTC)
+        step_results = self.api_executor.execute_fixture(fixture, variant=variant)
+        finished_at = datetime.now(UTC)
+
+        verdict, summary = self.verifier.evaluate(fixture.template, step_results)
+        plan_id = experiment_plan_id or f"plan_{fixture.id.replace('/', '_')}"
+
+        return ExperimentRun(
+            id=f"run_api_{uuid.uuid4().hex[:12]}",
+            experiment_plan_id=plan_id,
+            experiment_contract_digest=fixture.compute_contract_digest(),
+            subject_digest=fixture.compute_subject_digest(variant=variant),
+            template=fixture.template,
+            domain="API",
+            verdict=verdict,
+            started_at=started_at,
+            finished_at=finished_at,
+            step_results=step_results,
+            cleanup_succeeded=True,
+            summary=summary,
         )
 
     def execute_controlled_fixture(

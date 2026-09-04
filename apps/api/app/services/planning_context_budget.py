@@ -53,17 +53,30 @@ class PlanningContextBudgeter:
             used_warnings=len(truncated_warnings),
             truncated=truncated,
         )
+        change_summaries = []
+        for item in chosen_changes:
+            if item.change:
+                change_summaries.append(
+                    ChangeFactSummary(
+                        id=item.id,
+                        operation=item.change.operation.value,
+                        table=item.change.table,
+                        column=item.change.column,
+                    )
+                )
+            elif item.api_change:
+                change_summaries.append(
+                    ChangeFactSummary(
+                        id=item.id,
+                        operation=item.api_change.change_type.value,
+                        table=item.api_change.path,
+                        column=item.api_change.field_name,
+                    )
+                )
+
         return FailurePlanningContext(
             head_sha=head_sha,
-            changes=[
-                ChangeFactSummary(
-                    id=item.id,
-                    operation=item.change.operation.value,
-                    table=item.change.table,
-                    column=item.change.column,
-                )
-                for item in chosen_changes
-            ],
+            changes=change_summaries,
             evidence=[
                 EvidenceSummary(
                     id=item.id,
@@ -77,23 +90,34 @@ class PlanningContextBudgeter:
                 )
                 for item in chosen_evidence
             ],
-            scan_complete=scan_complete,
             warnings=truncated_warnings,
+            scan_complete=scan_complete,
             context_truncated=truncated,
             stats=stats,
         )
 
-    def _select_evidence(self, evidence: list[DependencyEvidence]) -> list[DependencyEvidence]:
+    def _select_evidence(
+        self, evidence: list[DependencyEvidence]
+    ) -> list[DependencyEvidence]:
+        if not evidence:
+            return []
         ranked = sorted(evidence, key=self._rank)
         groups: dict[str, deque[DependencyEvidence]] = defaultdict(deque)
         for item in ranked:
             groups[self._target_key(item)].append(item)
+
         selected: list[DependencyEvidence] = []
-        # First preserve target coverage; then fill remaining slots by global evidence strength.
-        for key in sorted(groups):
-            if len(selected) >= self.max_evidence:
+        while len(selected) < self.max_evidence:
+            progress = False
+            for key in list(groups.keys()):
+                if not groups[key]:
+                    continue
+                selected.append(groups[key].popleft())
+                progress = True
+                if len(selected) >= self.max_evidence:
+                    break
+            if not progress:
                 break
-            selected.append(groups[key].popleft())
         selected_ids = {item.id for item in selected}
         selected.extend(
             item for item in ranked if item.id not in selected_ids
@@ -102,15 +126,19 @@ class PlanningContextBudgeter:
 
     @staticmethod
     def _target_key(item: DependencyEvidence) -> str:
+        if item.target.field or item.target.path:
+            return f"{item.target.type.value}:{item.target.path or ''}:{item.target.field or ''}"
         return f"{item.target.type.value}:{item.target.table}:{item.target.column or ''}"
 
     @staticmethod
     def _rank(item: DependencyEvidence) -> tuple[int, int, int, str, int, str]:
         scope = {SourceScope.APPLICATION: 0, SourceScope.TEST: 1}[item.source_scope]
-        kind = {
+        kind_map = {
+            DependencyMatchKind.DIRECT_RESPONSE_FIELD_REFERENCE: 0,
             DependencyMatchKind.QUALIFIED_REFERENCE: 0,
             DependencyMatchKind.TABLE_AND_COLUMN_CONTEXT: 1,
             DependencyMatchKind.TABLE_IDENTIFIER: 2,
             DependencyMatchKind.COLUMN_IDENTIFIER: 3,
-        }[item.match_kind]
+        }
+        kind = kind_map.get(item.match_kind, 4)
         return (scope, kind, int(item.changed_in_pull_request), item.path, item.line, item.id)

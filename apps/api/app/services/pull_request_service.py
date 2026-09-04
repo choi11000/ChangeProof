@@ -2,6 +2,7 @@ import logging
 import re
 from urllib.parse import urlparse
 
+from app.analyzers.api_dependency import ApiDependencyAnalyzer
 from app.analyzers.dependency import (
     DependencyAnalyzer,
     build_change_facts,
@@ -9,14 +10,21 @@ from app.analyzers.dependency import (
     summarize_impact,
 )
 from app.analyzers.file_classifier import classify_file
+from app.analyzers.openapi_parser import (
+    OpenApiParseError,
+    OpenApiParser,
+    build_api_change_facts,
+)
 from app.analyzers.sql_migration import SqlMigrationParseError, SqlMigrationParser
 from app.clients.github import GitHubClient, GitHubError, GitHubFileContentUnavailable
 from app.core.config import get_settings
 from app.core.redaction import redact_sql_change
+from app.schemas.api_contract import ApiChange
 from app.schemas.github import (
     AnalysisStep,
     AnalysisWarning,
     AnalysisWarningCode,
+    ApiFileAnalysis,
     ChangedFile,
     ChangedFileStatus,
     ContentSource,
@@ -75,6 +83,8 @@ class PullRequestService:
         dependency_analyzer: DependencyAnalyzer | None = None,
         planning_service: FailurePlanningService | None = None,
         demo_policy: ControlledDemoPolicy | None = None,
+        openapi_parser: OpenApiParser | None = None,
+        api_dependency_analyzer: ApiDependencyAnalyzer | None = None,
     ) -> None:
         self._github = github_client
         self._sql_parser = sql_parser
@@ -82,6 +92,8 @@ class PullRequestService:
         self._dependency_analyzer = dependency_analyzer or DependencyAnalyzer()
         self._planning_service = planning_service or FailurePlanningService()
         self._demo_policy = demo_policy or ControlledDemoPolicy(get_settings())
+        self._openapi_parser = openapi_parser or OpenApiParser()
+        self._api_dependency_analyzer = api_dependency_analyzer or ApiDependencyAnalyzer()
 
     async def analyze(self, repository_input: str, pull_request: int) -> PullRequestAnalysis:
         completed_steps: list[AnalysisStep] = []
@@ -139,8 +151,39 @@ class PullRequestService:
             sql_failure_count=sum(item.error is not None for item in sql_files),
         )
 
+        # Process OpenAPI files
+        api_files: list[ApiFileAnalysis] = []
+        api_changes: list[ApiChange] = []
+        for item in classified:
+            if item.category is not FileCategory.OPENAPI_SPEC:
+                continue
+            analysis, changes, file_warnings = await self._analyze_openapi_file(
+                repository, metadata, item.file
+            )
+            api_files.append(analysis)
+            api_changes.extend(changes)
+            warnings.extend(file_warnings)
+
+        if any(item.category is FileCategory.OPENAPI_SPEC for item in classified):
+            completed_steps.append(AnalysisStep.FETCH_OPENAPI_CONTENT)
+            completed_steps.append(AnalysisStep.ANALYZE_OPENAPI)
+            self._log_step(
+                AnalysisStep.ANALYZE_OPENAPI,
+                repository.full_name,
+                pull_request,
+                api_success_count=sum(item.error is None for item in api_files),
+                api_change_count=len(api_changes),
+            )
+
         # Build change facts with stable IDs
         change_facts = build_change_facts(sql_files)
+        if api_changes:
+            api_facts = build_api_change_facts(
+                api_changes,
+                spec_file_path=api_files[0].path if api_files else "openapi.yaml",
+            )
+            change_facts.extend(api_facts)
+
         completed_steps.append(AnalysisStep.BUILD_CHANGE_FACTS)
         self._log_step(
             AnalysisStep.BUILD_CHANGE_FACTS,
@@ -151,6 +194,7 @@ class PullRequestService:
 
         # Extract dependency targets
         targets = extract_dependency_targets(sql_files, change_facts)
+
         completed_steps.append(AnalysisStep.EXTRACT_DEPENDENCY_TARGETS)
         self._log_step(
             AnalysisStep.EXTRACT_DEPENDENCY_TARGETS,
@@ -182,8 +226,12 @@ class PullRequestService:
         )
         warnings.extend(snapshot.warnings)
 
-        # Discover dependencies
+        # Discover dependencies (database + API)
         evidences = self._dependency_analyzer.analyze(targets, snapshot.documents)
+        if any(cf.domain == "API" for cf in change_facts):
+            api_evidences = self._api_dependency_analyzer.analyze(change_facts, snapshot.documents)
+            evidences.extend(api_evidences)
+
         completed_steps.append(AnalysisStep.DISCOVER_DEPENDENCIES)
         self._log_step(
             AnalysisStep.DISCOVER_DEPENDENCIES,
@@ -229,12 +277,16 @@ class PullRequestService:
 
         # Evaluate exact server-controlled demo execution policy (no substring matching)
         demo_decision = self._demo_policy.evaluate(repository, metadata, change_facts)
+        has_api_facts = any(cf.domain == "API" for cf in change_facts)
+        domain = "API" if has_api_facts and not sql_files else "DATABASE"
 
         return PullRequestAnalysis(
             repository=repository,
             pull_request=metadata,
             changed_files=classified,
             sql_files=sql_files,
+            api_files=api_files,
+            domain=domain,
             change_facts=change_facts,
             dependency_targets=targets,
             dependency_evidence=evidences,
@@ -247,6 +299,73 @@ class PullRequestService:
             ai_usage=self._planning_service.last_usage,
             warnings=warnings,
             completed_steps=completed_steps,
+        )
+
+    async def _analyze_openapi_file(
+        self,
+        repository: GitHubRepositoryRef,
+        metadata: PullRequestMetadata,
+        file: ChangedFile,
+    ) -> tuple[ApiFileAnalysis, list[ApiChange], list[AnalysisWarning]]:
+        try:
+            head_content = await self._github.fetch_file_content(
+                repository, file.path, metadata.head_sha
+            )
+        except (GitHubError, GitHubFileContentUnavailable) as error:
+            message = f"Failed to fetch head OpenAPI spec content: {error}"
+            return (
+                ApiFileAnalysis(path=file.path, status=file.status, error=message),
+                [],
+                [
+                    AnalysisWarning(
+                        code=AnalysisWarningCode.FILE_CONTENT_UNAVAILABLE,
+                        path=file.path,
+                        message=message,
+                    )
+                ],
+            )
+
+        base_text = ""
+        try:
+            base_content = await self._github.fetch_file_content(
+                repository, file.path, metadata.base_sha
+            )
+            if base_content and base_content.content:
+                base_text = base_content.content
+        except (GitHubError, GitHubFileContentUnavailable):
+            base_text = ""
+
+        head_text = head_content.content or ""
+        try:
+            changes = self._openapi_parser.compare(base_text, head_text, spec_file_path=file.path)
+        except OpenApiParseError as error:
+            message = str(error)
+            return (
+                ApiFileAnalysis(
+                    path=file.path,
+                    status=file.status,
+                    content_sha=head_content.sha,
+                    error=message,
+                ),
+                [],
+                [
+                    AnalysisWarning(
+                        code=AnalysisWarningCode.OPENAPI_PARSE_ERROR,
+                        path=file.path,
+                        message=message,
+                    )
+                ],
+            )
+
+        return (
+            ApiFileAnalysis(
+                path=file.path,
+                status=file.status,
+                content_sha=head_content.sha,
+                changes=changes,
+            ),
+            changes,
+            [],
         )
 
     async def _analyze_sql_file(

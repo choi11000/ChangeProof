@@ -20,8 +20,25 @@ FAILURE_STEPS = {
 }
 
 
+DB_REQUIRED_STEPS = {
+    ExperimentStepType.PREPARE_DATABASE,
+    ExperimentStepType.LOAD_BASELINE_SCHEMA,
+    ExperimentStepType.LOAD_SEED_DATA,
+    ExperimentStepType.APPLY_MIGRATION,
+    ExperimentStepType.RUN_READ_QUERY,
+    ExperimentStepType.CAPTURE_RESULT,
+}
+
+API_REQUIRED_STEPS = {
+    ExperimentStepType.PREPARE_API_ENVIRONMENT,
+    ExperimentStepType.SEND_HTTP_REQUEST,
+    ExperimentStepType.PROBE_RESPONSE_FIELD,
+    ExperimentStepType.CAPTURE_API_RESULT,
+}
+
+
 class ExperimentVerifier:
-    """Attribute verdicts only to complete, typed PostgreSQL observations."""
+    """Attribute verdicts only to complete, typed PostgreSQL or API observations."""
 
     def evaluate(
         self,
@@ -31,6 +48,47 @@ class ExperimentVerifier:
         expected_sqlstate: str | None = None,
     ) -> tuple[ExperimentVerdict, str]:
         step_map = {step.type: step for step in step_results}
+
+        # Handle API contract experiments
+        if template is ExperimentTemplate.API_RESPONSE_FIELD_COMPATIBILITY:
+            missing_api = API_REQUIRED_STEPS.difference(step_map)
+            if missing_api:
+                labels = ", ".join(sorted(step.value for step in missing_api))
+                return (
+                    ExperimentVerdict.INCONCLUSIVE,
+                    f"API experiment outcome inconclusive: Missing required steps: {labels}.",
+                )
+            probe = step_map[ExperimentStepType.PROBE_RESPONSE_FIELD]
+            if probe.status is ExperimentStepStatus.FAILED:
+                if probe.observation_code == "API_MISSING_RESPONSE_FIELD":
+                    return (
+                        ExperimentVerdict.PROVEN_FAIL,
+                        (
+                            "Failure reproduced in controlled API runtime with expected "
+                            "observation code API_MISSING_RESPONSE_FIELD."
+                        ),
+                    )
+                return (
+                    ExperimentVerdict.INCONCLUSIVE,
+                    (
+                        "Observed API failure had unexpected observation code: "
+                        f"{probe.observation_code}."
+                    ),
+                )
+            if all(step_map[s].status is ExperimentStepStatus.PASSED for s in API_REQUIRED_STEPS):
+                return (
+                    ExperimentVerdict.PROVEN_PASS,
+                    (
+                        "Failure not reproduced: Required response field is present "
+                        "and consumer probe passed."
+                    ),
+                )
+            return (
+                ExperimentVerdict.INCONCLUSIVE,
+                "API experiment outcome inconclusive: Required steps did not succeed.",
+            )
+
+        # Handle Database experiments
         prep = step_map.get(ExperimentStepType.PREPARE_DATABASE)
         if prep and prep.status is ExperimentStepStatus.FAILED:
             return (
@@ -49,7 +107,7 @@ class ExperimentVerifier:
                     f"Setup failure during {label}: {step.message}",
                 )
 
-        required = set(ExperimentStepType)
+        required = DB_REQUIRED_STEPS
         missing = required.difference(step_map)
         if missing:
             labels = ", ".join(sorted(step.value for step in missing))

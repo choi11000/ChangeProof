@@ -426,3 +426,113 @@ def _content(sql: str, sha: str) -> dict[str, Any]:
         "encoding": "base64",
         "content": base64.b64encode(sql.encode()).decode(),
     }
+
+
+def test_mocked_pr_pipeline_analyzes_openapi_spec() -> None:
+    base_openapi = """
+openapi: "3.0.0"
+info:
+  title: Users API
+  version: "1.0.0"
+paths:
+  /users/{id}:
+    get:
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: {type: integer}
+                  email: {type: string}
+"""
+    head_openapi = """
+openapi: "3.0.0"
+info:
+  title: Users API
+  version: "1.0.0"
+paths:
+  /users/{id}:
+    get:
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: {type: integer}
+"""
+    client_code = "return response['email']\n"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path == "/repos/acme/user-service":
+            return httpx.Response(200, json={"full_name": "acme/user-service"})
+        if path == "/repos/acme/user-service/pulls/10":
+            return httpx.Response(
+                200,
+                json={
+                    "number": 10,
+                    "title": "Remove email from User response",
+                    "body": "Breaking change",
+                    "state": "open",
+                    "base": {"ref": "main", "sha": "base-sha"},
+                    "head": {"ref": "feature/api", "sha": "head-sha"},
+                    "user": {"login": "dev"},
+                    "changed_files": 1,
+                    "html_url": "https://github.com/acme/user-service/pull/10",
+                },
+            )
+        if path == "/repos/acme/user-service/pulls/10/files":
+            return httpx.Response(
+                200,
+                json=[
+                    _file("openapi.yaml", status="modified", patch="@@ -10,1 +10,0 @@"),
+                ],
+            )
+        if path == "/repos/acme/user-service/contents/openapi.yaml":
+            ref = request.url.params.get("ref")
+            if ref == "base-sha":
+                return httpx.Response(200, json=_content(base_openapi, "sha-base-spec"))
+            if ref == "head-sha":
+                return httpx.Response(200, json=_content(head_openapi, "sha-head-spec"))
+        if "git/trees/head-sha" in path:
+            return httpx.Response(
+                200,
+                json={
+                    "sha": "head-sha",
+                    "tree": [
+                        {"path": "client/user_client.py", "type": "blob", "sha": "c1"},
+                    ],
+                    "truncated": False,
+                },
+            )
+        if path.endswith("/contents/client/user_client.py"):
+            return httpx.Response(200, json=_content(client_code, "sha-client"))
+        return httpx.Response(404, json={"message": f"Not found: {path}"})
+
+    async def scenario():
+        http_client = httpx.AsyncClient(
+            base_url="https://api.github.test", transport=httpx.MockTransport(handler)
+        )
+        async with http_client:
+            service = PullRequestService(GitHubClient(http_client), SqlMigrationParser())
+            return await service.analyze("https://github.com/acme/user-service", 10)
+
+    result = asyncio.run(scenario())
+
+    assert result.domain == "API"
+    assert len(result.api_files) == 1
+    assert result.api_files[0].path == "openapi.yaml"
+    assert len(result.api_files[0].changes) == 1
+    assert result.api_files[0].changes[0].field_name == "email"
+
+    assert len(result.change_facts) == 1
+    assert result.change_facts[0].domain == "API"
+    assert result.change_facts[0].api_change.field_name == "email"
+
+    assert len(result.dependency_evidence) == 1
+    assert result.dependency_evidence[0].target.field == "email"
+    assert result.dependency_evidence[0].path == "client/user_client.py"

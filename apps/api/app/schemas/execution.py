@@ -27,6 +27,9 @@ class ExperimentStepResult(BaseModel):
     status: ExperimentStepStatus
     duration_ms: int = Field(ge=0)
     sql_state: str | None = None
+    observation_code: str | None = None
+    json_pointer: str | None = None
+    http_status: int | None = None
     error_type: str | None = None
     message: str | None = None
     scalar_value: int | str | bool | None = None
@@ -39,6 +42,7 @@ class ExperimentRun(BaseModel):
     experiment_contract_digest: str
     subject_digest: str
     template: ExperimentTemplate
+    domain: str = "DATABASE"
     verdict: ExperimentVerdict
     started_at: datetime
     finished_at: datetime

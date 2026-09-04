@@ -254,6 +254,41 @@ class ExperimentCompiler:
                 "Migration applies cleanly without DDL syntax or dependency errors"
             )
 
+        elif template is ExperimentTemplate.API_RESPONSE_FIELD_COMPATIBILITY:
+            api_change = matching_changes[0].api_change
+            field_name = api_change.field_name if api_change else "unknown"
+            method = api_change.method if api_change else "GET"
+            path = api_change.path if api_change else "/users/1"
+            steps = [
+                ExperimentStep(
+                    order=1,
+                    type=ExperimentStepType.PREPARE_API_ENVIRONMENT,
+                    description="Initialize in-process ASGI provider environment",
+                ),
+                ExperimentStep(
+                    order=2,
+                    type=ExperimentStepType.SEND_HTTP_REQUEST,
+                    description=f"Send {method} request to {path}",
+                    endpoint=path,
+                    method=method,
+                ),
+                ExperimentStep(
+                    order=3,
+                    type=ExperimentStepType.PROBE_RESPONSE_FIELD,
+                    description=f"Run consumer probe verifying required field '{field_name}'",
+                    field_name=field_name,
+                ),
+                ExperimentStep(
+                    order=4,
+                    type=ExperimentStepType.CAPTURE_API_RESULT,
+                    description="Capture API response status and missing field observation",
+                ),
+            ]
+            expected_observation = (
+                "Consumer probe is expected to fail with missing response field error "
+                f"on '{field_name}'"
+            )
+
         raw_id = f"{hypothesis.id}:{template.value}:{':'.join(hypothesis.change_ids)}"
         digest = hashlib.sha256(raw_id.encode("utf-8")).hexdigest()[:12]
         plan_id = f"plan_{digest}"

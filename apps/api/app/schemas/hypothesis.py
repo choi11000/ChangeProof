@@ -16,11 +16,13 @@ class FailureCategory(StrEnum):
     NULLABILITY_COMPATIBILITY = "NULLABILITY_COMPATIBILITY"
     TYPE_COMPATIBILITY = "TYPE_COMPATIBILITY"
     TABLE_CONTRACT_BREAK = "TABLE_CONTRACT_BREAK"
+    API_CONTRACT_BREAK = "API_CONTRACT_BREAK"
     OTHER = "OTHER"
 
 
 class FailureHypothesis(BaseModel):
     id: str
+    domain: str = "DATABASE"
     category: FailureCategory
     title: str
     statement: str
