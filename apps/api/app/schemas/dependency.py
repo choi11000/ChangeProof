@@ -3,6 +3,7 @@ from enum import StrEnum
 from pydantic import BaseModel, Field
 
 from app.schemas.api_contract import ApiChange
+from app.schemas.performance import PerformanceChange
 from app.schemas.sql_change import SqlChange
 
 
@@ -11,6 +12,7 @@ class DependencyTargetType(StrEnum):
     COLUMN = "COLUMN"
     API_ENDPOINT = "API_ENDPOINT"
     API_FIELD = "API_FIELD"
+    PERFORMANCE_ENDPOINT = "PERFORMANCE_ENDPOINT"
 
 
 class ChangeFact(BaseModel):
@@ -21,6 +23,7 @@ class ChangeFact(BaseModel):
     statement_index: int = Field(default=0, ge=0)
     change: SqlChange | None = None
     api_change: ApiChange | None = None
+    performance_change: PerformanceChange | None = None
 
 
 class DependencyTarget(BaseModel):

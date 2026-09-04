@@ -15,6 +15,7 @@ from app.analyzers.openapi_parser import (
     OpenApiParser,
     build_api_change_facts,
 )
+from app.analyzers.performance_analyzer import PerformanceAnalyzer
 from app.analyzers.sql_migration import SqlMigrationParseError, SqlMigrationParser
 from app.clients.github import GitHubClient, GitHubError, GitHubFileContentUnavailable
 from app.core.config import get_settings
@@ -85,6 +86,7 @@ class PullRequestService:
         demo_policy: ControlledDemoPolicy | None = None,
         openapi_parser: OpenApiParser | None = None,
         api_dependency_analyzer: ApiDependencyAnalyzer | None = None,
+        performance_analyzer: PerformanceAnalyzer | None = None,
     ) -> None:
         self._github = github_client
         self._sql_parser = sql_parser
@@ -94,6 +96,7 @@ class PullRequestService:
         self._demo_policy = demo_policy or ControlledDemoPolicy(get_settings())
         self._openapi_parser = openapi_parser or OpenApiParser()
         self._api_dependency_analyzer = api_dependency_analyzer or ApiDependencyAnalyzer()
+        self._performance_analyzer = performance_analyzer or PerformanceAnalyzer()
 
     async def analyze(self, repository_input: str, pull_request: int) -> PullRequestAnalysis:
         completed_steps: list[AnalysisStep] = []
@@ -226,11 +229,38 @@ class PullRequestService:
         )
         warnings.extend(snapshot.warnings)
 
-        # Discover dependencies (database + API)
+        # Discover performance change facts and evidence from Python routes
+        perf_facts = []
+        perf_evidences = []
+        for doc in snapshot.documents:
+            if doc.path.endswith(".py"):
+                is_changed = doc.path in changed_paths
+                f_facts, f_evidences = self._performance_analyzer.analyze_source(
+                    doc.content, file_path=doc.path, changed_in_pull_request=is_changed
+                )
+                if is_changed:
+                    perf_facts.extend(f_facts)
+                perf_evidences.extend(f_evidences)
+
+        if perf_facts:
+            change_facts.extend(perf_facts)
+            completed_steps.append(AnalysisStep.ANALYZE_PERFORMANCE)
+            self._log_step(
+                AnalysisStep.ANALYZE_PERFORMANCE,
+                repository.full_name,
+                pull_request,
+                perf_fact_count=len(perf_facts),
+            )
+            for ev in perf_evidences:
+                targets.append(ev.target)
+
+        # Discover dependencies (database + API + Performance)
         evidences = self._dependency_analyzer.analyze(targets, snapshot.documents)
         if any(cf.domain == "API" for cf in change_facts):
             api_evidences = self._api_dependency_analyzer.analyze(change_facts, snapshot.documents)
             evidences.extend(api_evidences)
+        if perf_evidences:
+            evidences.extend(perf_evidences)
 
         completed_steps.append(AnalysisStep.DISCOVER_DEPENDENCIES)
         self._log_step(
@@ -277,8 +307,14 @@ class PullRequestService:
 
         # Evaluate exact server-controlled demo execution policy (no substring matching)
         demo_decision = self._demo_policy.evaluate(repository, metadata, change_facts)
+        has_perf_facts = any(cf.domain == "PERFORMANCE" for cf in change_facts)
         has_api_facts = any(cf.domain == "API" for cf in change_facts)
-        domain = "API" if has_api_facts and not sql_files else "DATABASE"
+        if has_perf_facts:
+            domain = "PERFORMANCE"
+        elif has_api_facts and not sql_files:
+            domain = "API"
+        else:
+            domain = "DATABASE"
 
         return PullRequestAnalysis(
             repository=repository,
