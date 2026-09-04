@@ -37,6 +37,9 @@ export default function Home() {
           <li>
             <b>3</b> {t.flowStep3}
           </li>
+          <li>
+            <b>4</b> {t.flowStep4}
+          </li>
         </ol>
 
         <AnalysisForm />

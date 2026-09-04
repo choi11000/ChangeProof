@@ -15,12 +15,47 @@ export interface Translations {
   heroTitle1: string;
   heroTitle2: string;
   heroLede: string;
+  heroSublede: string;
   flowStep1: string;
   flowStep2: string;
   flowStep3: string;
+  flowStep4: string;
   flowAriaLabel: string;
   pipelineAriaLabel: string;
   stages: string[];
+  runPerfDemoBtn: string;
+  howItWorksBtn: string;
+
+  // Tabs
+  tabPeakLoadTitle: string;
+  tabCompatibilityTitle: string;
+  tabLocalRunnerTitle: string;
+
+  // Performance Demo
+  perfDemoTitle: string;
+  perfDemoSubtitle: string;
+  runPeakLoadBtn: string;
+  runningPeakLoadBtn: string;
+  applyFixBtn: string;
+  applyingFixBtn: string;
+  runSameLoadBtn: string;
+  baselineCardTitle: string;
+  candidateCardTitle: string;
+  remediatedCardTitle: string;
+  metricConcurrency: string;
+  metricRequests: string;
+  metricP50: string;
+  metricP95: string;
+  metricP99: string;
+  metricThroughput: string;
+  metricTimeouts: string;
+  metricDownstreamWait: string;
+  badgeSameLoad: string;
+  badgeSameConditions: string;
+  badgeChangedSubject: string;
+  verdictBottleneck: string;
+  verdictRecovered: string;
+  verdictHealthy: string;
 
   // Principles
   principleEyebrow: string;
@@ -46,8 +81,11 @@ export interface Translations {
   apiDemoTabDesc: string;
   apiDemoHint: string;
   apiDemoScenario: string;
+  perfDemoHint: string;
+  perfDemoScenario: string;
   domainDatabase: string;
   domainApi: string;
+  domainPerformance: string;
   orDivider: string;
   manualAnalysisLabel: string;
 
@@ -155,26 +193,61 @@ export const translations: Record<Language, Translations> = {
     langEn: "English",
 
     // Hero
-    heroEyebrow: "데이터베이스 변경 리스크 검증 에이전트",
-    heroTitle1: "배포 전에 실패를",
-    heroTitle2: "직접 재현하세요.",
+    heroEyebrow: "운영 피크 장애 선제 검증 에이전트",
+    heroTitle1: "사용자가 몰리기 전에,",
+    heroTitle2: "병목을 먼저 재현하세요.",
     heroLede:
-      "PR의 변경과 숨은 의존성을 찾아, 실제 PostgreSQL에서 깨지는지 확인합니다.",
-    flowStep1: "변경사항 분석",
-    flowStep2: "장애 재현 (샌드박스)",
-    flowStep3: "수정 검증 (동일 실험)",
-    flowAriaLabel: "3단계 증명 흐름",
-    pipelineAriaLabel: "분석 파이프라인",
-    stages: ["이해", "의존성", "검증", "증거", "복구"],
+      "ChangeProof는 코드 변경을 분석해 운영 피크 시간에 발생할 수 있는 부하 시나리오를 AI가 만들고, 개발 환경에서 실제 부하를 실행해 장애를 배포 전에 재현합니다.",
+    heroSublede: "개발계에서는 멀쩡한데 운영 피크에서만 터지는 장애를 배포 전에 선제 검증합니다.",
+    flowStep1: "기능 테스트 통과 (단일 요청 정상)",
+    flowStep2: "AI 위험 분석 (외부 의존성 감지)",
+    flowStep3: "피크 트래픽 재현 (병목 검증)",
+    flowStep4: "동일 부하 회복 검증 (수정 후 재실행)",
+    flowAriaLabel: "4단계 부하 증명 흐름",
+    pipelineAriaLabel: "부하 검증 파이프라인",
+    stages: ["코드 변경", "위험 팩트", "AI 시나리오", "동시 부하 실행", "병목 재현", "회복 검증"],
+    runPerfDemoBtn: "피크 장애 데모 실행",
+    howItWorksBtn: "작동 원리",
+
+    // Tabs
+    tabPeakLoadTitle: "피크 부하 장애 검증",
+    tabCompatibilityTitle: "호환성 검증 (DB / API)",
+    tabLocalRunnerTitle: "로컬 러너 (Local Runner)",
+
+    // Performance Demo
+    perfDemoTitle: "ShiftSafe 피크 트래픽 병목 재현 데모",
+    perfDemoSubtitle: "GET /dashboard 핫 경로에 동기 외부 API(날씨) 호출이 추가된 위험 변경 시나리오",
+    runPeakLoadBtn: "피크 트래픽 재현 실행 (150 동시 요청) →",
+    runningPeakLoadBtn: "동시 부하 실행 및 지연 시간 측정 중...",
+    applyFixBtn: "수정 적용 및 동일 부하 재실행 →",
+    applyingFixBtn: "동일 부하 조건에서 수정본 재검증 중...",
+    runSameLoadBtn: "동일한 부하 다시 실행",
+    baselineCardTitle: "변경 전 (Baseline)",
+    candidateCardTitle: "위험 변경 (Candidate)",
+    remediatedCardTitle: "수정 적용 (Remediated)",
+    metricConcurrency: "동시 요청 수",
+    metricRequests: "총 요청 수",
+    metricP50: "p50 지연 시간",
+    metricP95: "p95 지연 시간",
+    metricP99: "p99 지연 시간",
+    metricThroughput: "초당 처리량 (RPS)",
+    metricTimeouts: "타임아웃 발생률",
+    metricDownstreamWait: "외부 의존성 대기열",
+    badgeSameLoad: "SAME LOAD (동일 부하)",
+    badgeSameConditions: "SAME CONDITIONS (동일 조건)",
+    badgeChangedSubject: "CHANGED SUBJECT (수정 적용)",
+    verdictBottleneck: "병목 재현됨 (PROVEN_BOTTLENECK)",
+    verdictRecovered: "복구 검증 완료 (PROVEN_RECOVERED)",
+    verdictHealthy: "정상 (HEALTHY)",
 
     // Principles
-    principleEyebrow: "설계 기반 결정론",
-    principleTitle1: "추론은 가설을 만들고,",
-    principleTitle2: "증거가 판정을 내립니다.",
-    capabilityLabel: "현재 지원 기능",
-    capabilityTitle: "PR → 구조화된 변경 팩트",
+    principleEyebrow: "신뢰 모델 (TECHNICAL TRUST MODEL)",
+    principleTitle1: "추측이 아닌 실제 동시 부하로,",
+    principleTitle2: "배포 전 병목을 증명합니다.",
+    capabilityLabel: "핵심 차별점",
+    capabilityTitle: "코드 변경 기반 타깃 부하 테스트",
     capabilityDesc:
-      "임의로 조작된 리스크 점수는 없습니다. 모든 팩트는 직접 검사 가능한 실제 소스 코드에서 시작합니다.",
+      "일반적인 성능 모니터링이나 부하 툴과 달리, ChangeProof는 이번 변경으로 인해 발생할 수 있는 특정 병목 시나리오를 식별하고 정밀 검증합니다.",
 
     // Analysis Form
     repoLabel: "GitHub 저장소",
@@ -183,17 +256,20 @@ export const translations: Record<Language, Translations> = {
     prPlaceholder: "42",
     analyzeBtn: "변경사항 분석",
     analyzingBtn: "분석 중…",
-    loadDemoBtn: "Live Demo 실행하기",
-    demoHint: "검증된 실패 데모를 직접 실행해 보세요",
-    demoScenario: "DROP COLUMN → 숨은 의존성 → SQLSTATE 42703",
+    loadDemoBtn: "피크 부하 데모 실행하기",
+    demoHint: "운영 피크 병목 재현 데모를 직접 실행해 보세요",
+    demoScenario: "ShiftSafe 데모: GET /dashboard + 외부 날씨 API 대기열 증폭",
     databaseDemoTabTitle: "데이터베이스 스키마",
     databaseDemoTabDesc: "DROP COLUMN → PostgreSQL (42703)",
     apiDemoTabTitle: "API 계약 (OpenAPI)",
     apiDemoTabDesc: "REMOVE_RESPONSE_FIELD → ASGI",
     apiDemoHint: "API 계약 파괴적 변경 데모를 실행해 보세요",
     apiDemoScenario: "GET /users/{id} 응답 'email' 필드 제거 → 소비자 직접 참조 실패",
+    perfDemoHint: "운영 피크 병목 재현 데모를 직접 실행해 보세요",
+    perfDemoScenario: "GET /dashboard + 외부 API 추가 → 150 동시 요청 시 4.8초 지연 폭발",
     domainDatabase: "데이터베이스",
     domainApi: "API 계약",
+    domainPerformance: "피크 부하 장애",
     orDivider: "또는",
     manualAnalysisLabel: "GitHub 저장소와 PR을 직접 분석",
 
@@ -300,26 +376,61 @@ export const translations: Record<Language, Translations> = {
     langEn: "English",
 
     // Hero
-    heroEyebrow: "DATABASE CHANGE RISK AGENT",
-    heroTitle1: "Reproduce the failure",
-    heroTitle2: "before it ships.",
+    heroEyebrow: "CHANGE-AWARE LOAD FAILURE PROOF",
+    heroTitle1: "Reproduce the bottleneck",
+    heroTitle2: "before peak traffic does.",
     heroLede:
-      "Find the pull request change and its hidden dependencies, then test them in real PostgreSQL.",
-    flowStep1: "Analyze the change",
-    flowStep2: "Reproduce the failure",
-    flowStep3: "Verify the fix",
-    flowAriaLabel: "Three-step proof flow",
-    pipelineAriaLabel: "Analysis pipeline",
-    stages: ["Understand", "Dependencies", "Validate", "Evidence", "Remediate"],
+      "ChangeProof analyzes code changes, generates targeted peak-load experiments, and reproduces production bottlenecks in dev before deployment.",
+    heroSublede: "Detect performance regressions that pass functional tests but explode under concurrent traffic.",
+    flowStep1: "Functional Test PASS (Single Request OK)",
+    flowStep2: "AI Risk Scenario (Hot Path Dependency)",
+    flowStep3: "Reproduce Peak Load (Bottleneck Proven)",
+    flowStep4: "Same-Load Recovery (Pass Verified)",
+    flowAriaLabel: "Four-step load proof flow",
+    pipelineAriaLabel: "Verification pipeline",
+    stages: ["Code Change", "Risk Facts", "AI Scenario", "Concurrent Load", "Bottleneck Proven", "Recovery Verified"],
+    runPerfDemoBtn: "Run Peak Load Demo",
+    howItWorksBtn: "How It Works",
+
+    // Tabs
+    tabPeakLoadTitle: "Peak Load Proof",
+    tabCompatibilityTitle: "Compatibility Proofs (DB / API)",
+    tabLocalRunnerTitle: "Local Runner",
+
+    // Performance Demo
+    perfDemoTitle: "ShiftSafe Peak Traffic Bottleneck Demo",
+    perfDemoSubtitle: "Risky change: Synchronous weather client call added to GET /dashboard hot request path",
+    runPeakLoadBtn: "Reproduce Peak Load (150 Concurrent Users) →",
+    runningPeakLoadBtn: "Generating concurrent load and tracking latency...",
+    applyFixBtn: "Apply Fix & Run Same Load →",
+    applyingFixBtn: "Re-verifying fix under identical load...",
+    runSameLoadBtn: "Run Same Load Again",
+    baselineCardTitle: "Before Change (Baseline)",
+    candidateCardTitle: "Risky Change (Candidate)",
+    remediatedCardTitle: "Remediated (Fixed)",
+    metricConcurrency: "Concurrency",
+    metricRequests: "Total Requests",
+    metricP50: "p50 Latency",
+    metricP95: "p95 Latency",
+    metricP99: "p99 Latency",
+    metricThroughput: "Throughput (RPS)",
+    metricTimeouts: "Timeout Rate",
+    metricDownstreamWait: "Downstream Wait",
+    badgeSameLoad: "SAME LOAD",
+    badgeSameConditions: "SAME CONDITIONS",
+    badgeChangedSubject: "CHANGED SUBJECT",
+    verdictBottleneck: "PROVEN_BOTTLENECK",
+    verdictRecovered: "PROVEN_RECOVERED",
+    verdictHealthy: "HEALTHY",
 
     // Principles
-    principleEyebrow: "DETERMINISTIC BY DESIGN",
-    principleTitle1: "Reasoning makes a hypothesis.",
+    principleEyebrow: "TECHNICAL TRUST MODEL",
+    principleTitle1: "Deterministic verification under real load.",
     principleTitle2: "Evidence earns the verdict.",
-    capabilityLabel: "CURRENT CAPABILITY",
-    capabilityTitle: "PR → structured change facts",
+    capabilityLabel: "CORE DIFFERENTIATOR",
+    capabilityTitle: "Change-aware load verification agent",
     capabilityDesc:
-      "No invented risk score. Every fact starts with source we can inspect.",
+      "Unlike generic APMs or load generators, ChangeProof detects WHAT CHANGED and compiles targeted concurrent load experiments to prove or disprove regressions.",
 
     // Analysis Form
     repoLabel: "GitHub repository",
@@ -328,17 +439,20 @@ export const translations: Record<Language, Translations> = {
     prPlaceholder: "42",
     analyzeBtn: "Analyze change",
     analyzingBtn: "Analyzing…",
-    loadDemoBtn: "Run Live Demo",
-    demoHint: "Try the proven failure demo",
-    demoScenario: "DROP COLUMN → hidden dependency → SQLSTATE 42703",
+    loadDemoBtn: "Run Peak Load Demo",
+    demoHint: "Try the production peak bottleneck reproduction demo",
+    demoScenario: "ShiftSafe demo: GET /dashboard + external weather API queue amplification",
     databaseDemoTabTitle: "Database Schema",
     databaseDemoTabDesc: "DROP COLUMN → PostgreSQL (42703)",
     apiDemoTabTitle: "API Contract (OpenAPI)",
     apiDemoTabDesc: "REMOVE_RESPONSE_FIELD → ASGI",
     apiDemoHint: "Try the API contract breaking change demo",
     apiDemoScenario: "GET /users/{id} response field 'email' removed → consumer direct reference fails",
+    perfDemoHint: "Try the production peak load reproduction demo",
+    perfDemoScenario: "GET /dashboard + external API → 150 concurrent users causes 4.8s p95 explosion",
     domainDatabase: "Database",
     domainApi: "API Contract",
+    domainPerformance: "Peak Load Proof",
     orDivider: "or",
     manualAnalysisLabel: "Analyze a GitHub repository and pull request manually",
 
@@ -501,6 +615,10 @@ export function translateCategory(category: string, lang: Language): string {
       return "데이터 타입 호환성 위반 (TYPE_COMPATIBILITY)";
     case "TABLE_CONTRACT_BREAK":
       return "테이블 계약 위반 (TABLE_CONTRACT_BREAK)";
+    case "API_CONTRACT_BREAK":
+      return "API 계약 위반 (API_CONTRACT_BREAK)";
+    case "EXTERNAL_DEPENDENCY_BOTTLENECK":
+      return "외부 의존성 병목 (EXTERNAL_DEPENDENCY_BOTTLENECK)";
     default:
       return category;
   }
@@ -521,6 +639,8 @@ export function translateTemplate(template: string, lang: Language): string {
       return "마이그레이션 적용 검증 (MIGRATION_APPLY)";
     case "API_RESPONSE_FIELD_COMPATIBILITY":
       return "API 응답 필드 호환성 검증 (API_RESPONSE_FIELD_COMPATIBILITY)";
+    case "EXTERNAL_DEPENDENCY_LATENCY":
+      return "외부 의존성 지연 증폭 검증 (EXTERNAL_DEPENDENCY_LATENCY)";
     default:
       return template;
   }
@@ -571,6 +691,14 @@ export function translateStepType(stepType: string, lang: Language): string {
       return "소비자 필드 프로브 실행 (PROBE_RESPONSE_FIELD)";
     case "CAPTURE_API_RESULT":
       return "API 결과 관측 (CAPTURE_API_RESULT)";
+    case "INITIALIZE_LOAD_ENVIRONMENT":
+      return "부하 테스트 환경 준비 (INITIALIZE_LOAD_ENVIRONMENT)";
+    case "RUN_BASELINE_LOAD":
+      return "기준 부하 실행 (RUN_BASELINE_LOAD)";
+    case "RUN_CONCURRENT_LOAD":
+      return "동시 피크 부하 실행 (RUN_CONCURRENT_LOAD)";
+    case "CAPTURE_PERFORMANCE_METRICS":
+      return "성능 지표 및 지연 관측 (CAPTURE_PERFORMANCE_METRICS)";
     default:
       return stepType;
   }
@@ -649,11 +777,20 @@ export function translateObservation(observation: string, lang: Language): strin
     const field = observation.match(/'([^']+)'/)?.[1] ?? "field";
     return `응답에서 필수 필드 '${field}'가 누락되어 소비자 프로브 실행 실패 예상`;
   }
+  if (/saturate downstream capacity/i.test(observation) || /queue accumulation/i.test(observation)) {
+    return "피크 동시 요청 시 외부 의존성 용량 포화로 인해 대기열이 급증하고 p95 응답 지연 폭발 및 타임아웃 발생 예상";
+  }
   return observation;
 }
 
 export function translateRunSummary(summary: string, lang: Language): string {
   if (lang !== "ko") return summary;
+  if (/Peak bottleneck reproduced/i.test(summary) || /downstream queue amplification/i.test(summary)) {
+    return "통제된 부하 테스트에서 피크 병목 재현 성공: 동시 요청 증가 시 외부 의존성 용량 포화로 대기열이 적체되고 p95 지연 시간이 폭증했습니다 (DOWNSTREAM_QUEUE_AMPLIFICATION).";
+  }
+  if (/Peak load experiment passed/i.test(summary) || /Healthy throughput and latency/i.test(summary)) {
+    return "피크 부하 검증 통과: 동시 트래픽 상황에서도 캐시 및 단일 요청 병합으로 정상적인 처리량과 안정적 지연 시간을 유지했습니다.";
+  }
   if (
     /Column is removed by migration and referenced query failed with SQLSTATE 42703/i.test(summary)
   ) {
