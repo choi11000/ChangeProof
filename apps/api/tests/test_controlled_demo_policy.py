@@ -160,3 +160,95 @@ def test_demo_identity_unconfigured_denied() -> None:
 
     assert decision.allowed is False
     assert decision.fixture_id is None
+
+
+def _api_change_fact() -> ChangeFact:
+    from app.schemas.api_contract import ApiChange, ApiChangeType
+    return ChangeFact(
+        id="cf_api_1",
+        domain="API",
+        api_change=ApiChange(
+            change_type=ApiChangeType.REMOVE_RESPONSE_FIELD,
+            method="GET",
+            path="/users/{id}",
+            status_code=200,
+            media_type="application/json",
+            field_name="email",
+            schema_name="User",
+            json_pointer="#/components/schemas/User/properties/email",
+            destructive=True,
+            spec_file_path="openapi.yaml",
+        ),
+    )
+
+
+def test_api_demo_exact_identity_allowed() -> None:
+    settings = Settings(
+        controlled_demo_repository="choi11000/changeproof-demo",
+        controlled_demo_pr=1,
+        controlled_demo_head_sha="08302ccf5e67d12eee0d6470ac1136f4f644cba5",
+        controlled_api_demo_repository="choi11000/changeproof-api-demo",
+        controlled_api_demo_pr=1,
+        controlled_api_demo_head_sha="api_head_sha_12345",
+    )
+    policy = ControlledDemoPolicy(settings)
+
+    repo = GitHubRepositoryRef(owner="choi11000", repo="changeproof-api-demo")
+    meta = PullRequestMetadata(
+        repository="choi11000/changeproof-api-demo",
+        number=1,
+        title="Demo API PR",
+        state="open",
+        base_branch="main",
+        head_branch="demo/remove-user-email",
+        base_sha="base_sha_456",
+        head_sha="api_head_sha_12345",
+        changed_files=1,
+        html_url="https://github.com/choi11000/changeproof-api-demo/pull/1",
+    )
+    decision = policy.evaluate(repo, meta, [_api_change_fact()])
+
+    assert decision.allowed is True
+    assert decision.fixture_id == "api-contract/remove-user-email"
+
+
+def test_api_demo_wrong_pr_or_sha_denied() -> None:
+    settings = Settings(
+        controlled_api_demo_repository="choi11000/changeproof-api-demo",
+        controlled_api_demo_pr=1,
+        controlled_api_demo_head_sha="api_head_sha_12345",
+    )
+    policy = ControlledDemoPolicy(settings)
+
+    repo = GitHubRepositoryRef(owner="choi11000", repo="changeproof-api-demo")
+    meta_wrong_pr = PullRequestMetadata(
+        repository="choi11000/changeproof-api-demo",
+        number=99,
+        title="Demo API PR",
+        state="open",
+        base_branch="main",
+        head_branch="demo/remove-user-email",
+        base_sha="base_sha_456",
+        head_sha="api_head_sha_12345",
+        changed_files=1,
+        html_url="https://github.com/choi11000/changeproof-api-demo/pull/99",
+    )
+    decision = policy.evaluate(repo, meta_wrong_pr, [_api_change_fact()])
+    assert decision.allowed is False
+    assert "limited to the audited demo pull request #1" in decision.notice
+
+    meta_wrong_sha = PullRequestMetadata(
+        repository="choi11000/changeproof-api-demo",
+        number=1,
+        title="Demo API PR",
+        state="open",
+        base_branch="main",
+        head_branch="demo/remove-user-email",
+        base_sha="base_sha_456",
+        head_sha="wrong_sha",
+        changed_files=1,
+        html_url="https://github.com/choi11000/changeproof-api-demo/pull/1",
+    )
+    decision2 = policy.evaluate(repo, meta_wrong_sha, [_api_change_fact()])
+    assert decision2.allowed is False
+    assert "not the audited revision" in decision2.notice

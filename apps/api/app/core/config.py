@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     controlled_demo_repository: str | None = "choi11000/changeproof-demo"
     controlled_demo_pr: int | None = 1
     controlled_demo_head_sha: str | None = "08302ccf5e67d12eee0d6470ac1136f4f644cba5"
+    controlled_api_demo_repository: str | None = "choi11000/changeproof-api-demo"
+    controlled_api_demo_pr: int | None = 1
+    controlled_api_demo_head_sha: str | None = "demo-api-head-sha"
     port: int = 8000
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

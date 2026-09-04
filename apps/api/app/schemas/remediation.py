@@ -10,6 +10,7 @@ class RemediationStrategy(StrEnum):
     PRESERVE_TABLE_COMPATIBILITY = "PRESERVE_TABLE_COMPATIBILITY"
     BACKFILL_BEFORE_NOT_NULL = "BACKFILL_BEFORE_NOT_NULL"
     NORMALIZE_BEFORE_TYPE_CHANGE = "NORMALIZE_BEFORE_TYPE_CHANGE"
+    PRESERVE_API_RESPONSE_FIELD_COMPATIBILITY = "PRESERVE_API_RESPONSE_FIELD_COMPATIBILITY"
 
 
 class RemediationProofVerdict(StrEnum):
@@ -29,6 +30,7 @@ class RemediationProof(BaseModel):
     id: str
     fixture_id: str
     remediation_id: str
+    domain: str = "DATABASE"
     strategy: RemediationStrategy
     description: str
     experiment_contract_digest: str

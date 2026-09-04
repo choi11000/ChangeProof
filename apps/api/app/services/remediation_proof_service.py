@@ -1,5 +1,6 @@
 import uuid
 
+from app.fixtures.api_fixtures import get_controlled_api_fixture
 from app.fixtures.experiment_registry import get_controlled_fixture
 from app.fixtures.remediation_registry import get_controlled_remediation
 from app.schemas.execution import ExecuteExperimentRequest, ExperimentRun, ExperimentVerdict
@@ -49,6 +50,32 @@ class RemediationProofService:
         self.execution_service = execution_service
 
     def prove(self, request: RemediationProofRequest) -> RemediationProof:
+        # Check API fixtures first
+        api_fixture = get_controlled_api_fixture(request.fixture_id)
+        if api_fixture is not None:
+            before = self.execution_service.execute_controlled_api_fixture(
+                api_fixture, variant="changed"
+            )
+            after = self.execution_service.execute_controlled_api_fixture(
+                api_fixture, variant="remediated"
+            )
+            verdict, same_experiment, subject_changed = evaluate_proof_pair(before, after)
+            return RemediationProof(
+                id=f"proof_api_{uuid.uuid4().hex[:12]}",
+                fixture_id=api_fixture.id,
+                remediation_id=f"remediation/{api_fixture.id}",
+                domain="API",
+                strategy=api_fixture.remediation_strategy,
+                description=api_fixture.remediation_description,
+                experiment_contract_digest=before.experiment_contract_digest,
+                before=before,
+                after=after,
+                verdict=verdict,
+                same_experiment=same_experiment,
+                subject_changed=subject_changed,
+                summary=self._summary(verdict),
+            )
+
         fixture = get_controlled_fixture(request.fixture_id)
         remediation = get_controlled_remediation(request.fixture_id)
         if fixture is None or remediation is None:

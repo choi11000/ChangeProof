@@ -24,6 +24,9 @@ class ControlledDemoPolicy:
         self._demo_repo = (settings.controlled_demo_repository or "").strip().lower()
         self._demo_pr = settings.controlled_demo_pr
         self._demo_sha = (settings.controlled_demo_head_sha or "").strip().lower()
+        self._api_demo_repo = (settings.controlled_api_demo_repository or "").strip().lower()
+        self._api_demo_pr = settings.controlled_api_demo_pr
+        self._api_demo_sha = (settings.controlled_api_demo_head_sha or "").strip().lower()
 
     def evaluate(
         self,
@@ -31,14 +34,55 @@ class ControlledDemoPolicy:
         metadata: PullRequestMetadata,
         change_facts: list[ChangeFact],
     ) -> ControlledDemoDecision:
-        # If no server demo identity is configured, sandbox execution is disabled
+        repo_full_name = repository.full_name.strip().lower()
+        actual_sha = metadata.head_sha.strip().lower()
+
+        # 1. Check API Demo Exact Identity
+        if self._api_demo_repo and repo_full_name == self._api_demo_repo:
+            if self._api_demo_pr is None or not self._api_demo_sha:
+                return ControlledDemoDecision(
+                    allowed=False,
+                    notice="Sandbox execution is limited to controlled demo fixtures in this MVP.",
+                )
+            if metadata.number != self._api_demo_pr:
+                return ControlledDemoDecision(
+                    allowed=False,
+                    notice=(
+                        "Sandbox execution is limited to the audited demo pull request "
+                        f"#{self._api_demo_pr}."
+                    ),
+                )
+            if actual_sha != self._api_demo_sha:
+                return ControlledDemoDecision(
+                    allowed=False,
+                    notice=(
+                        "Sandbox execution is disabled because this demo revision is not "
+                        "the audited revision."
+                    ),
+                )
+            for cf in change_facts:
+                if cf.domain == "API" and cf.api_change:
+                    ch = cf.api_change
+                    if ch.method == "GET" and "/users" in ch.path and ch.field_name == "email":
+                        return ControlledDemoDecision(
+                            allowed=True,
+                            fixture_id="api-contract/remove-user-email",
+                        )
+            return ControlledDemoDecision(
+                allowed=False,
+                notice=(
+                    "Sandbox execution is disabled: Changes in this demo PR do not map "
+                    "to any registered controlled fixture."
+                ),
+            )
+
+        # 2. Check Database Demo Exact Identity
         if not self._demo_repo or self._demo_pr is None or not self._demo_sha:
             return ControlledDemoDecision(
                 allowed=False,
                 notice="Sandbox execution is limited to controlled demo fixtures in this MVP.",
             )
 
-        repo_full_name = repository.full_name.strip().lower()
         if repo_full_name != self._demo_repo:
             return ControlledDemoDecision(
                 allowed=False,
@@ -54,7 +98,6 @@ class ControlledDemoPolicy:
                 ),
             )
 
-        actual_sha = metadata.head_sha.strip().lower()
         if actual_sha != self._demo_sha:
             return ControlledDemoDecision(
                 allowed=False,
