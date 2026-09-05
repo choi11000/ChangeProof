@@ -15,7 +15,7 @@
 * **공식 데모 저장소 (DB)**: [https://github.com/choi11000/changeproof-demo](https://github.com/choi11000/changeproof-demo) (PR #1)
 * **공식 데모 저장소 (API)**: [https://github.com/choi11000/changeproof-api-demo](https://github.com/choi11000/changeproof-api-demo) (PR #1)
 * **검증된 정상 동작 결과**:
-  * **Primary: Production Load Failure Proof ("사용자가 몰리기 전에, 병목을 먼저 재현하세요")**:
+  * **Primary: Production Load Failure Proof ("트래픽이 몰리기 전에, 숨은 병목을 먼저 검증하세요"):**
     * 기능 테스트: HTTP 200 `PASS` ("한 명이 사용하면 정상입니다.")
     * 변경 팩트: `GET /dashboard` + 새로운 외부 날씨 API 호출 (`EXTERNAL_CALL_ADDED_TO_REQUEST_PATH`)
     * AI 부하 가설: `사용자가 몰릴 경우 외부 API 응답을 기다리는 요청이 쌓일 수 있습니다.` (상태: `PROPOSED / UNVERIFIED`)

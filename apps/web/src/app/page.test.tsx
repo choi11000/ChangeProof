@@ -23,13 +23,13 @@ describe("Home - Production Load Failure Proof", () => {
     renderHome();
 
     // Slogan and hero
-    expect(screen.getByRole("heading", { name: /사용자가 몰리기 전에/i })).toBeInTheDocument();
-    expect(screen.getByText(/병목을 먼저 재현하세요/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /트래픽이 몰리기 전에/i })).toBeInTheDocument();
+    expect(screen.getByText(/숨은 병목을 먼저 검증하세요/i)).toBeInTheDocument();
 
     // 4-step flow
     expect(screen.getByRole("list", { name: /4단계 부하 증명 흐름/i })).toBeInTheDocument();
     expect(screen.getByText(/기능 테스트 통과 \(단일 요청 정상\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/동일 부하 회복 검증 \(수정 후 재실행\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/동일 부하 재검증 \(수정 후 정상 회복 확인\)/i)).toBeInTheDocument();
 
     // Tab navigation
     expect(screen.getByRole("tab", { name: /피크 부하 장애 검증/i })).toBeInTheDocument();
@@ -41,7 +41,7 @@ describe("Home - Production Load Failure Proof", () => {
     expect(screen.getByText(/기능 테스트 통과 · PASS \(200 OK, 15ms\)/i)).toBeInTheDocument();
     expect(screen.getByText(/AI 가설: PROPOSED \/ UNVERIFIED/i)).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /피크 트래픽 재현 실행/i }),
+      screen.getByRole("button", { name: /피크 부하 실행/i }),
     ).toBeInTheDocument();
   });
 
@@ -49,7 +49,7 @@ describe("Home - Production Load Failure Proof", () => {
     renderHome();
 
     // Default is Korean
-    expect(screen.getByRole("heading", { name: /사용자가 몰리기 전에/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /트래픽이 몰리기 전에/i })).toBeInTheDocument();
 
     // Switch to English
     fireEvent.click(screen.getByRole("button", { name: "English" }));
@@ -58,7 +58,7 @@ describe("Home - Production Load Failure Proof", () => {
 
     // Switch back to Korean
     fireEvent.click(screen.getByRole("button", { name: "한국어" }));
-    expect(screen.getByRole("heading", { name: /사용자가 몰리기 전에/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /트래픽이 몰리기 전에/i })).toBeInTheDocument();
   });
 
   it("executes peak load experiment and proves bottleneck, then proves recovery under same load", async () => {
@@ -183,11 +183,11 @@ describe("Home - Production Load Failure Proof", () => {
     renderHome();
 
     // Click Peak Load Demo button
-    const runBtn = screen.getByRole("button", { name: /피크 트래픽 재현 실행/i });
+    const runBtn = screen.getByRole("button", { name: /피크 부하 실행/i });
     fireEvent.click(runBtn);
 
     // Verify Bottleneck Reproduction
-    await waitFor(() => expect(screen.getByText("병목 재현됨 (PROVEN_BOTTLENECK)")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("병목 확인 (PROVEN_BOTTLENECK)")).toBeInTheDocument());
     expect(screen.getByText(/관측: DOWNSTREAM_QUEUE_AMPLIFICATION/i)).toBeInTheDocument();
     expect(screen.getAllByText("4820 ms").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("18%")).toBeInTheDocument();
@@ -199,7 +199,7 @@ describe("Home - Production Load Failure Proof", () => {
     fireEvent.click(fixBtn);
 
     // Verify Recovery Proof under same load
-    await waitFor(() => expect(screen.getByText("복구 검증 완료 (PROVEN_RECOVERED)")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("정상 회복 검증 (PROVEN_RECOVERED)")).toBeInTheDocument());
     expect(screen.getByText(/SAME LOAD/i)).toBeInTheDocument();
     expect(screen.getByText(/SAME CONDITIONS/i)).toBeInTheDocument();
     expect(screen.getByText(/CHANGED SUBJECT/i)).toBeInTheDocument();

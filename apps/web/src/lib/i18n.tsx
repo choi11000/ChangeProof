@@ -194,18 +194,18 @@ export const translations: Record<Language, Translations> = {
 
     // Hero
     heroEyebrow: "운영 피크 장애 선제 검증 에이전트",
-    heroTitle1: "사용자가 몰리기 전에,",
-    heroTitle2: "병목을 먼저 재현하세요.",
+    heroTitle1: "트래픽이 몰리기 전에,",
+    heroTitle2: "숨은 병목을 먼저 검증하세요.",
     heroLede:
-      "ChangeProof는 코드 변경을 분석해 운영 피크 시간에 발생할 수 있는 부하 시나리오를 AI가 만들고, 개발 환경에서 실제 부하를 실행해 장애를 배포 전에 재현합니다.",
-    heroSublede: "개발계에서는 멀쩡한데 운영 피크에서만 터지는 장애를 배포 전에 선제 검증합니다.",
+      "ChangeProof는 코드 변경 사항을 분석하여 운영 피크 부하 시나리오를 자동 생성하고, 배포 전 개발 환경에서 실제 부하를 가해 숨은 병목과 장애를 선제 검증합니다.",
+    heroSublede: "단일 기능 테스트는 통과하지만, 동시 접속 피크에서 터지는 성능 장애를 사전에 차단합니다.",
     flowStep1: "기능 테스트 통과 (단일 요청 정상)",
-    flowStep2: "AI 위험 분석 (외부 의존성 감지)",
-    flowStep3: "피크 트래픽 재현 (병목 검증)",
-    flowStep4: "동일 부하 회복 검증 (수정 후 재실행)",
+    flowStep2: "AI 위험 분석 (병목 요인 식별)",
+    flowStep3: "피크 부하 실행 (병목 재현)",
+    flowStep4: "동일 부하 재검증 (수정 후 정상 회복 확인)",
     flowAriaLabel: "4단계 부하 증명 흐름",
     pipelineAriaLabel: "부하 검증 파이프라인",
-    stages: ["코드 변경", "위험 팩트", "AI 시나리오", "동시 부하 실행", "병목 재현", "회복 검증"],
+    stages: ["코드 변경", "위험 분석", "AI 부하 시나리오", "동시 부하 실행", "병목 재현", "정상 회복 검증"],
     runPerfDemoBtn: "피크 장애 데모 실행",
     howItWorksBtn: "작동 원리",
 
@@ -216,14 +216,14 @@ export const translations: Record<Language, Translations> = {
 
     // Performance Demo
     perfDemoTitle: "ShiftSafe 피크 트래픽 병목 재현 데모",
-    perfDemoSubtitle: "GET /dashboard 핫 경로에 동기 외부 API(날씨) 호출이 추가된 위험 변경 시나리오",
-    runPeakLoadBtn: "피크 트래픽 재현 실행 (150 동시 요청) →",
+    perfDemoSubtitle: "GET /dashboard 핵심 경로에 동기식 외부 날씨 API 호출이 추가된 성능 위험 시나리오",
+    runPeakLoadBtn: "피크 부하 실행 (150 동시 요청) →",
     runningPeakLoadBtn: "동시 부하 실행 및 지연 시간 측정 중...",
     applyFixBtn: "수정 적용 및 동일 부하 재실행 →",
     applyingFixBtn: "동일 부하 조건에서 수정본 재검증 중...",
     runSameLoadBtn: "동일한 부하 다시 실행",
     baselineCardTitle: "변경 전 (Baseline)",
-    candidateCardTitle: "위험 변경 (Candidate)",
+    candidateCardTitle: "검증 대상 변경 (Candidate)",
     remediatedCardTitle: "수정 적용 (Remediated)",
     metricConcurrency: "동시 요청 수",
     metricRequests: "총 요청 수",
@@ -232,68 +232,68 @@ export const translations: Record<Language, Translations> = {
     metricP99: "p99 지연 시간",
     metricThroughput: "초당 처리량 (RPS)",
     metricTimeouts: "타임아웃 발생률",
-    metricDownstreamWait: "외부 의존성 대기열",
+    metricDownstreamWait: "외부 의존성 대기 시간",
     badgeSameLoad: "SAME LOAD (동일 부하)",
     badgeSameConditions: "SAME CONDITIONS (동일 조건)",
     badgeChangedSubject: "CHANGED SUBJECT (수정 적용)",
-    verdictBottleneck: "병목 재현됨 (PROVEN_BOTTLENECK)",
-    verdictRecovered: "복구 검증 완료 (PROVEN_RECOVERED)",
+    verdictBottleneck: "병목 확인 (PROVEN_BOTTLENECK)",
+    verdictRecovered: "정상 회복 검증 (PROVEN_RECOVERED)",
     verdictHealthy: "정상 (HEALTHY)",
 
     // Principles
     principleEyebrow: "신뢰 모델 (TECHNICAL TRUST MODEL)",
     principleTitle1: "추측이 아닌 실제 동시 부하로,",
-    principleTitle2: "배포 전 병목을 증명합니다.",
+    principleTitle2: "실측 증거를 통해 판정합니다.",
     capabilityLabel: "핵심 차별점",
     capabilityTitle: "코드 변경 기반 타깃 부하 테스트",
     capabilityDesc:
-      "일반적인 성능 모니터링이나 부하 툴과 달리, ChangeProof는 이번 변경으로 인해 발생할 수 있는 특정 병목 시나리오를 식별하고 정밀 검증합니다.",
+      "단순 모니터링이나 무작위 부하 생성기와 달리, ChangeProof는 '무엇이 변경되었는가'를 감지하여 해당 코드에 특화된 동시 부하 실험을 구성하고 성능 저하를 엄밀하게 검증합니다.",
 
     // Analysis Form
     repoLabel: "GitHub 저장소",
     repoPlaceholder: "https://github.com/acme/risky-saas",
     prLabel: "풀 리퀘스트 번호",
     prPlaceholder: "42",
-    analyzeBtn: "변경사항 분석",
+    analyzeBtn: "코드 변경 분석",
     analyzingBtn: "분석 중…",
     loadDemoBtn: "피크 부하 데모 실행하기",
     demoHint: "운영 피크 병목 재현 데모를 직접 실행해 보세요",
-    demoScenario: "ShiftSafe 데모: GET /dashboard + 외부 날씨 API 대기열 증폭",
+    demoScenario: "ShiftSafe 데모: GET /dashboard + 외부 날씨 API 지연 증폭",
     databaseDemoTabTitle: "데이터베이스 스키마",
     databaseDemoTabDesc: "DROP COLUMN → PostgreSQL (42703)",
-    apiDemoTabTitle: "API 계약 (OpenAPI)",
+    apiDemoTabTitle: "API 스펙 (OpenAPI)",
     apiDemoTabDesc: "REMOVE_RESPONSE_FIELD → ASGI",
-    apiDemoHint: "API 계약 파괴적 변경 데모를 실행해 보세요",
-    apiDemoScenario: "GET /users/{id} 응답 'email' 필드 제거 → 소비자 직접 참조 실패",
+    apiDemoHint: "API 호환성 파괴(Breaking Change) 검증 데모를 실행해 보세요",
+    apiDemoScenario: "GET /users/{id} 응답의 'email' 필드 삭제 → 클라이언트 필드 참조 실패",
     perfDemoHint: "운영 피크 병목 재현 데모를 직접 실행해 보세요",
-    perfDemoScenario: "GET /dashboard + 외부 API 추가 → 150 동시 요청 시 4.8초 지연 폭발",
+    perfDemoScenario: "GET /dashboard + 외부 API 추가 → 150 동시 요청 시 p95 지연 시간 4.8초 폭증",
     domainDatabase: "데이터베이스",
-    domainApi: "API 계약",
+    domainApi: "API 스펙",
     domainPerformance: "피크 부하 장애",
     orDivider: "또는",
-    manualAnalysisLabel: "GitHub 저장소와 PR을 직접 분석",
+    manualAnalysisLabel: "GitHub 저장소 및 PR 직접 분석",
 
     // Proof Summary
     proofSummaryEyebrow: "PROOF SUMMARY",
-    proofSummaryHeading: "이 실험에서 확인된 결론",
-    summaryChangeLabel: "PR 변경",
-    summaryChangePending: "구조화된 변경 팩트",
-    summaryDependencyLabel: "미변경 의존성",
-    summaryDependencyFound: "숨은 애플리케이션 참조 발견",
-    summaryDependencyPending: "참조 증거 없음",
-    summaryObservationLabel: "PostgreSQL 관측",
-    summaryObservationApiLabel: "API 런타임 관측",
+    proofSummaryHeading: "통제 실험 검증 요약",
+    summaryChangeLabel: "PR 변경 사항",
+    summaryChangePending: "구조화된 변경 내역 대기",
+    summaryDependencyLabel: "기존 코드 의존성",
+    summaryDependencyFound: "기존 코드의 숨은 참조 발견",
+    summaryDependencyPending: "참조 근거 없음",
+    summaryObservationLabel: "PostgreSQL 실측 결과",
+    summaryObservationApiLabel: "API 런타임 실측 결과",
     summaryObservationPending: "격리 실험 실행 대기",
-    summaryVerdictLabel: "결정론적 판정",
-    summaryVerdictPending: "PENDING",
+    summaryVerdictLabel: "최종 검증 판정",
+    summaryVerdictPending: "대기 중 (PENDING)",
     scopeInvariant:
-      "이 증명은 해당 통제 실험에만 적용되며, 전체 PR이나 프로덕션 시스템의 안전성을 의미하지 않습니다.",
-    deterministicDetails: "결정론적 팩트와 의존성 증거",
-    hypothesisDetails: "AI 가설과 실행 계획",
-    experimentDetails: "실험 단계 보기",
+      "본 검증 결과는 설계된 통제 실험 환경에 한정되며, PR 전체나 운영 환경의 절대적 무결성을 보증하는 것은 아닙니다.",
+    deterministicDetails: "확정된 변경 내역 및 의존성 근거",
+    hypothesisDetails: "AI 장애 가설 및 실험 계획",
+    experimentDetails: "실험 절차 상세 보기",
 
     // Change Facts
-    changeFactsEyebrow: "구조화된 변경 팩트",
+    changeFactsEyebrow: "구조화된 변경 내역",
     changedFiles: "변경된 파일",
     sqlMigrations: "SQL 마이그레이션",
     appFiles: "애플리케이션 파일",
@@ -301,71 +301,71 @@ export const translations: Record<Language, Translations> = {
 
     // Impact Surface
     impactEyebrow: "영향 범위 (Impact Surface)",
-    impactHeading: "크로스 레이어 애플리케이션 참조",
-    impactIncomplete: "제한적 스캔 (불완전)",
-    targetEntities: "대상 엔터티",
+    impactHeading: "계층 간 애플리케이션 참조 현황",
+    impactIncomplete: "부분 스캔 (제한적)",
+    targetEntities: "대상 엔티티",
     appFilesAffected: "영향받는 앱 파일",
     directReferences: "직접 참조",
     potentialReferences: "잠재적 참조",
 
     // Dependency Evidence
-    evidenceEyebrow: "의존성 증거",
-    evidenceHeading: "결정론적 소스 코드 매칭",
+    evidenceEyebrow: "의존성 근거",
+    evidenceHeading: "소스 코드 정적 매칭 결과",
     badgeChangedInPr: "이번 PR에서 변경됨",
-    badgeNotChangedInPr: "이번 PR에서 변경되지 않음",
+    badgeNotChangedInPr: "기존 코드 (변경 없음)",
     matchDirect: "직접 참조",
     matchContext: "테이블 + 컬럼 컨텍스트",
     matchColId: "컬럼 식별자",
     matchTableId: "테이블 식별자",
-    noEvidenceComplete: "스캔된 애플리케이션 파일에서 소스 참조를 찾지 못했습니다.",
-    noEvidenceIncomplete: "스캔된 하위 집합에서 참조를 찾지 못했습니다. 소스 분석이 제한되었습니다.",
+    noEvidenceComplete: "스캔된 애플리케이션 파일에서 참조 코드를 발견하지 못했습니다.",
+    noEvidenceIncomplete: "스캔 범위 내에서 참조 코드를 발견하지 못했습니다. (일부 파일만 분석됨)",
 
     // Failure Hypotheses & Plans
     hypothesesEyebrow: "장애 가설 및 실험 계획",
-    hypothesesHeading: "증거 기반 AI 추론",
-    unverifiedProposal: "미검증 제안",
+    hypothesesHeading: "코드 근거 기반 AI 추론",
+    unverifiedProposal: "제안됨 (미검증)",
     hypothesisBadge: "가설 •",
-    rationaleLabel: "근거:",
+    rationaleLabel: "도출 근거:",
     expectedFailureLabel: "예상 장애:",
     proposedExperimentBadge: "제안된 실험 •",
-    templateLabel: "템플릿:",
-    executedInSandbox: "샌드박스에서 실행 완료",
+    templateLabel: "실험 템플릿:",
+    executedInSandbox: "샌드박스 실행 완료",
     notExecutedYet: "아직 실행되지 않음",
     expectedObservationLabel: "예상 관측 결과:",
-    runExperimentBtn: "격리된 PostgreSQL에서 실험 실행 →",
-    runningExperimentBtn: "PostgreSQL에서 장애 재현 중...",
-    sandboxNoticeDefault: "샌드박스 실행은 이번 MVP에서 제어된 데모 픽스처로 제한됩니다.",
-    noHypothesisGenerated: "이 변경사항에 대해 생성된 증거 기반 장애 가설이 없습니다.",
+    runExperimentBtn: "격리된 PostgreSQL 환경에서 실험 실행 →",
+    runningExperimentBtn: "격리 환경에서 장애 재현 중...",
+    sandboxNoticeDefault: "현재 데모 버전에서는 준비된 시나리오에 한해 샌드박스 격리 실행을 지원합니다.",
+    noHypothesisGenerated: "이 변경 사항에 대해 도출된 장애 가설이 없습니다.",
 
     // Observed Result
     reproducedFailBadge: "재현 완료 • PROVEN FAIL",
     notReproducedPassBadge: "미재현 • PROVEN PASS",
-    reproducedFailHeadline: "격리된 PostgreSQL에서 장애가 재현되었습니다.",
-    notReproducedPassHeadline: "이 실험은 예상된 장애 없이 완료되었습니다.",
-    inconclusiveHeadline: "결정적이지 않은 관측 결과로 실험이 완료되었습니다.",
-    passSubnote: "이 판정은 전체 풀 리퀘스트가 아닌 이 실험에만 적용됩니다.",
+    reproducedFailHeadline: "격리 환경에서 예상된 장애가 재현되었습니다.",
+    notReproducedPassHeadline: "실험 결과, 우려되었던 장애가 발생하지 않고 정상 완료되었습니다.",
+    inconclusiveHeadline: "판정 불가: 명확한 장애 징후를 특정할 수 없는 결과입니다.",
+    passSubnote: "이 판정은 PR 전체가 아닌 해당 실험 조건에 한정됩니다.",
     stepLabel: "단계",
-    experimentContractLabel: "실험 계약:",
-    subjectLabel: "대상:",
-    cleanupLabel: "정리 상태:",
-    cleanupSucceeded: "성공",
+    experimentContractLabel: "실험 규약(Contract):",
+    subjectLabel: "검증 대상:",
+    cleanupLabel: "리소스 정리:",
+    cleanupSucceeded: "완료",
     cleanupFailed: "실패",
     cleanupUnknown: "알 수 없음",
 
     // Remediation
-    remediationEyebrow: "복구 (Remediation)",
-    noRemediationNeeded: "이 실험에는 복구가 필요하지 않습니다.",
-    remediationHeading: "결정론적 호환성 복구",
-    remediationDesc: "이 검증된 복구책은 동일한 실험 계약을 통해 검증됩니다.",
-    verifyRemediationBtn: "복구 검증 →",
-    verifyingRemediationBtn: "신뢰할 수 있는 전후 비교 실험 실행 중...",
-    remediationRequiresFailure: "복구 검증은 장애가 확실히 재현된 경우에만 가능합니다.",
-    beforeLabel: "복구 전 (Before)",
-    sameExperimentLabel: "동일한 실험 (Same experiment)",
-    contractLabel: "계약:",
-    afterLabel: "복구 후 (After)",
-    invariantSameExp: "동일 실험:",
-    invariantSubjectChanged: "대상 변경:",
+    remediationEyebrow: "장애 복구 (Remediation)",
+    noRemediationNeeded: "이 실험에서는 추가 조치가 필요하지 않습니다.",
+    remediationHeading: "호환성 복구 및 안전 조치",
+    remediationDesc: "제공된 안전 복구 패치를 동일한 실험 조건에서 재검증합니다.",
+    verifyRemediationBtn: "복구 검증 실행 →",
+    verifyingRemediationBtn: "동일 조건에서 전후 비교 검증 중...",
+    remediationRequiresFailure: "장애가 먼저 재현된 상태에서만 복구 검증을 진행할 수 있습니다.",
+    beforeLabel: "수정 전 (Before)",
+    sameExperimentLabel: "동일 실험 조건 (Same Experiment)",
+    contractLabel: "실험 조건:",
+    afterLabel: "수정 후 (After)",
+    invariantSameExp: "동일 실험 여부:",
+    invariantSubjectChanged: "대상 코드 수정 여부:",
     yes: "예",
     no: "아니오",
   },
@@ -682,15 +682,15 @@ export function translateStepType(stepType: string, lang: Language): string {
     case "RUN_CONCURRENT_TRANSACTION":
       return "동시 트랜잭션 실행 (RUN_CONCURRENT_TRANSACTION)";
     case "CAPTURE_RESULT":
-      return "결과 관측 (CAPTURE_RESULT)";
+      return "실측 결과 캡처 (CAPTURE_RESULT)";
     case "PREPARE_API_ENVIRONMENT":
       return "인프로세스 ASGI API 환경 준비 (PREPARE_API_ENVIRONMENT)";
     case "SEND_HTTP_REQUEST":
       return "HTTP 요청 전송 (SEND_HTTP_REQUEST)";
     case "PROBE_RESPONSE_FIELD":
-      return "소비자 필드 프로브 실행 (PROBE_RESPONSE_FIELD)";
+      return "클라이언트 필드 프로브 실행 (PROBE_RESPONSE_FIELD)";
     case "CAPTURE_API_RESULT":
-      return "API 결과 관측 (CAPTURE_API_RESULT)";
+      return "API 실측 결과 캡처 (CAPTURE_API_RESULT)";
     case "INITIALIZE_LOAD_ENVIRONMENT":
       return "부하 테스트 환경 준비 (INITIALIZE_LOAD_ENVIRONMENT)";
     case "RUN_BASELINE_LOAD":
@@ -698,7 +698,7 @@ export function translateStepType(stepType: string, lang: Language): string {
     case "RUN_CONCURRENT_LOAD":
       return "동시 피크 부하 실행 (RUN_CONCURRENT_LOAD)";
     case "CAPTURE_PERFORMANCE_METRICS":
-      return "성능 지표 및 지연 관측 (CAPTURE_PERFORMANCE_METRICS)";
+      return "성능 지표 및 지연 시간 실측 (CAPTURE_PERFORMANCE_METRICS)";
     default:
       return stepType;
   }
@@ -756,10 +756,10 @@ export function translateStepDescription(description: string, lang: Language): s
   }
   if (/^Run consumer probe verifying required field '([^']+)'/i.test(description)) {
     const field = description.match(/'([^']+)'/)?.[1] ?? "field";
-    return `필수 응답 필드 '${field}'에 대한 소비자 프로브 실행`;
+    return `필수 응답 필드 '${field}'에 대한 클라이언트 프로브 실행`;
   }
   if (/^Capture API response/i.test(description)) {
-    return "API 응답 상태 및 누락 필드 관측 결과 캡처";
+    return "API 응답 상태 및 누락 필드 실측 결과 캡처";
   }
   return description;
 }
@@ -775,10 +775,10 @@ export function translateObservation(observation: string, lang: Language): strin
   }
   if (/fail with missing response field error on '([^']+)'/i.test(observation)) {
     const field = observation.match(/'([^']+)'/)?.[1] ?? "field";
-    return `응답에서 필수 필드 '${field}'가 누락되어 소비자 프로브 실행 실패 예상`;
+    return `응답에서 필수 필드 '${field}'가 누락되어 클라이언트 프로브 실행 실패 예상`;
   }
   if (/saturate downstream capacity/i.test(observation) || /queue accumulation/i.test(observation)) {
-    return "피크 동시 요청 시 외부 의존성 용량 포화로 인해 대기열이 급증하고 p95 응답 지연 폭발 및 타임아웃 발생 예상";
+    return "피크 동시 요청 시 외부 의존성 지연으로 대기열이 급증하여 p95 응답 지연 폭증 및 타임아웃 발생 예상";
   }
   return observation;
 }
@@ -786,27 +786,27 @@ export function translateObservation(observation: string, lang: Language): strin
 export function translateRunSummary(summary: string, lang: Language): string {
   if (lang !== "ko") return summary;
   if (/Peak bottleneck reproduced/i.test(summary) || /downstream queue amplification/i.test(summary)) {
-    return "통제된 부하 테스트에서 피크 병목 재현 성공: 동시 요청 증가 시 외부 의존성 용량 포화로 대기열이 적체되고 p95 지연 시간이 폭증했습니다 (DOWNSTREAM_QUEUE_AMPLIFICATION).";
+    return "통제된 부하 테스트를 통해 피크 병목 재현: 동시 요청 급증 시 외부 의존성 지연으로 대기열이 적체되어 p95 지연 시간이 폭발했습니다 (DOWNSTREAM_QUEUE_AMPLIFICATION).";
   }
   if (/Peak load experiment passed/i.test(summary) || /Healthy throughput and latency/i.test(summary)) {
-    return "피크 부하 검증 통과: 동시 트래픽 상황에서도 캐시 및 단일 요청 병합으로 정상적인 처리량과 안정적 지연 시간을 유지했습니다.";
+    return "피크 부하 검증 통과: 동시 트래픽 피크 상황에서도 캐시 및 요청 병합(Single-flight)을 통해 정상적인 처리량과 안정적 지연 시간을 유지했습니다.";
   }
   if (
     /Column is removed by migration and referenced query failed with SQLSTATE 42703/i.test(summary)
   ) {
-    return "격리된 PostgreSQL에서 장애 재현 성공: 마이그레이션에 의해 컬럼이 삭제되었으며, 참조 쿼리 실행 시 SQLSTATE 42703 (undefined_column: column does not exist) 오류가 발생했습니다.";
+    return "격리된 PostgreSQL 환경에서 장애 재현: 마이그레이션으로 컬럼이 삭제된 상태에서 참조 쿼리를 실행하여 SQLSTATE 42703 (undefined_column: column does not exist) 오류가 발생했습니다.";
   }
   if (/API_MISSING_RESPONSE_FIELD/i.test(summary) || /missing from response payload/i.test(summary)) {
-    return "통제된 API 런타임에서 장애 재현 성공: 응답에 필수 필드가 누락되어 소비자 프로브가 실패했습니다 (API_MISSING_RESPONSE_FIELD).";
+    return "통제된 API 런타임 환경에서 장애 재현: 응답 본문에 필수 필드가 누락되어 클라이언트 프로브 검증이 실패했습니다 (API_MISSING_RESPONSE_FIELD).";
   }
   if (/Failure reproduced/i.test(summary)) {
     return "격리된 환경에서 장애가 재현되었습니다.";
   }
   if (/Consumer probe passed/i.test(summary)) {
-    return "통제된 API 런타임 검증 성공: 필수 응답 필드가 존재하여 소비자 프로브가 정상 통과했습니다.";
+    return "통제된 API 런타임 검증 통과: 필수 응답 필드가 정상 반환되어 클라이언트 프로브가 통과했습니다.";
   }
   if (/Verification passed/i.test(summary)) {
-    return "복구 적용 후 검증을 통과했습니다.";
+    return "안전 패치 적용 후 동일 조건 검증을 정상 통과했습니다.";
   }
   return summary;
 }

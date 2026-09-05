@@ -1,8 +1,8 @@
 # ChangeProof
 
-**사용자가 몰리기 전에, 병목을 먼저 재현하세요.**
+**트래픽이 몰리기 전에, 숨은 병목을 먼저 검증하세요.**
 
-ChangeProof는 코드 변경을 분석해 이번 릴리스에서 새로 검증해야 할 부하 위험을 AI가 제안하고, 개발 환경에서 실제 동시 요청을 실행해 운영 피크 시간에 나타날 수 있는 병목을 배포 전에 재현하는 AI 테스트 에이전트입니다.
+ChangeProof는 코드 변경 사항을 분석해 운영 피크 시 발생할 수 있는 부하 위험을 AI가 예측하고, 배포 전 개발 환경에서 실제 동시 요청을 실행해 잠재된 성능 병목을 선제 재현·검증하는 테스트 에이전트입니다.
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Peak%20Load%20Proof-blue?style=for-the-badge&logo=railway)](https://changeproof-web-production.up.railway.app)
 [![CI Status](https://img.shields.io/badge/CI-Passing-brightgreen?style=for-the-badge&logo=githubactions)](https://github.com/choi11000/ChangeProof/actions)
